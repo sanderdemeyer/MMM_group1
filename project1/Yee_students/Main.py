@@ -50,4 +50,7 @@ yee1.run()
 #of the electric field at every iteration
 output=yee1.output
 
-
+output = list(output[0])
+print(np.shape(output))
+pt.plot(range(len(output)), output)
+pt.show()
