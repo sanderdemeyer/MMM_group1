@@ -49,3 +49,5 @@ A = np.array([[0, 1], [2, 3]])
 print(A[(0, 1)])
 
 print(([(2, 2)]))
+
+print('fdjk' == 'fdsjqklm')

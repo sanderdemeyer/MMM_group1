@@ -1,5 +1,6 @@
 import numpy as np
 import numpy.linalg as linalg
+import numpy.fft as fft
 import matplotlib.pyplot as plt
 
 epsilon_0 = 8.85*10**(-12)
@@ -10,7 +11,7 @@ N = 30
 
 iterations = 400
 
-modulated = True
+source = 'sine'
 J0 = 1
 tc = 5
 sigma_source = 1
@@ -33,18 +34,23 @@ print(delta_t)
 
 observation_points_ez = [(15, 0), (0, 15), (15, 15)]
 
-def def_jz(modulated):
+def def_jz(source):
     jz = np.zeros((M, N, iterations))
-    if modulated:
+    if source == 'gaussian_modulated':
         for n in range(iterations):
             for i in range(M):
                 for j in range(N):
                     jz[i, j, n] = J0*np.exp(-(n-tc)**2/(2*sigma_source**2))*np.exp(-(i**2 + j**2)/(2*sigma_source**2))
-    else:
+    elif source == 'gaussian':
         for n in range(iterations):
             for i in range(M):
                 for j in range(N):
                     jz[i, j, n] = J0*np.exp(-(n-tc)**2/(2*sigma_source**2))*np.sin(omega_c*n*delta_t)*np.exp(-(i**2 + j**2)/(2*sigma_source**2))
+    elif source == 'sine':
+        for n in range(iterations):
+            for i in range(M):
+                for j in range(N):
+                    jz[i, j, n] = J0*np.sin(omega_c*n*delta_t)*np.exp(-(i**2 + j**2)/(2*sigma_source**2))
     return jz
 
 def update_bx(bx_old, ez_old, E):
@@ -58,9 +64,7 @@ def update_bx(bx_old, ez_old, E):
     bx[:,-1] = bx_old[:,-1] - (ez_old[:,0] - ez_old[:,-1]) # add periodic boundary condition
     return bx
 
-def update_implicit(ez_old, hy_old, bx, n):
-    # to be changed
-    [A, B] = def_update_matrices(epsilon, mu, sigma, delta_x, delta_y, delta_t, n)
+def update_implicit(ez_old, hy_old, bx, n, A, B):
 
     bx_term = -(delta_t/2)*np.divide(bx, np.multiply(mu, delta_y_matrix))
     C_term_base = np.roll(bx_term, -1, 0) + bx_term - np.roll(np.roll(bx_term, -1, 0), 1, 1) - np.roll(bx_term, 1, 1)
@@ -84,9 +88,7 @@ def def_explicit_update_matrix():
         E[b, b] = delta_x[i]/delta_t
     return E
 
-def def_update_matrices(epsilon, mu, sigma, delta_x, delta_y, delta_t, n):
-    # try-except should be changed. This works, but should be changed to boundary conditions (PML)
-    # efficiency idea: start with matrices that are the same for each step, then only change the others
+def def_update_matrices(epsilon, mu, sigma, delta_x, delta_y, delta_t):
     A = np.zeros((2*M, 2*M))
     B = np.zeros((2*M, 2*M))
 
@@ -149,9 +151,11 @@ def run():
 
     E = def_explicit_update_matrix()
 
+    [A, B] = def_update_matrices(epsilon, mu, sigma, delta_x, delta_y, delta_t)
+
     for n in range(iterations):
         print(f'iteration {n+1}/{iterations} started')
-        [ez, hy, bx] = step(ez, hy, bx, E, n)
+        [ez, hy, bx] = step(ez, hy, bx, E, A, B, n)
         bx_list[:,:,n] = bx
 
         for i, point in enumerate(observation_points_ez):
@@ -159,13 +163,13 @@ def run():
 
     return bx_list, ez_list
 
-def step(ez_old, hy_old, bx_old, E, n):
+def step(ez_old, hy_old, bx_old, E, A, B, n):
     bx_new = update_bx(bx_old, ez_old, E)
-    [ez_new, hy_new] = update_implicit(ez_old, hy_old, bx_new, n)
+    [ez_new, hy_new] = update_implicit(ez_old, hy_old, bx_new, n, A, B)
     return [ez_new, hy_new, bx_new]
 
 
-jz = def_jz(modulated)
+jz = def_jz(source)
 
 
 [bx_list, ez_list] = run()
@@ -177,3 +181,7 @@ for i, point in enumerate(observation_points_ez):
     plt.ylabel('Ez')
     plt.title(f'Ez at {point}')
     plt.show()
+
+    fft_transform = fft.fft(ez_list[:,i])
+    print(fft_transform)
+
