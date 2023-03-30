@@ -38,3 +38,14 @@ print(np.array([np.repeat(zz[i], M) for i in range(N)]))
 
 
 print(d*7)
+
+
+A = np.zeros((5, 4))
+print(A[4, 2])
+print(A[(4, 2)])
+
+
+A = np.array([[0, 1], [2, 3]])
+print(A[(0, 1)])
+
+print(([(2, 2)]))

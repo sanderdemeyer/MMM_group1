@@ -1,5 +1,3 @@
-#%%
-
 import numpy as np
 import numpy.linalg as linalg
 import matplotlib.pyplot as plt
@@ -7,10 +5,10 @@ import matplotlib.pyplot as plt
 epsilon_0 = 8.85*10**(-12)
 mu_0 = 1.25663706*10**(-6)
 
-M = 7
-N = 9
+M = 30
+N = 30
 
-iterations = 50
+iterations = 400
 
 modulated = True
 J0 = 1
@@ -27,9 +25,13 @@ delta_x = np.ones(M)*10**(-1)
 delta_y = np.ones(N)*10**(-1)
 delta_x_matrix = np.array([np.repeat(delta_x[i], N) for i in range(M)])
 delta_y_matrix = np.array([delta_y for i in range(M)])
-delta_t = 10**(-10)
+delta_t = 10**(-11)
 
-observation_point_ez = np.array([[2, 2]])
+courant_number = 1
+delta_t = np.max(delta_y)/(3*10**8)*courant_number
+print(delta_t)
+
+observation_points_ez = [(15, 0), (0, 15), (15, 15)]
 
 def def_jz(modulated):
     jz = np.zeros((M, N, iterations))
@@ -61,12 +63,13 @@ def update_implicit(ez_old, hy_old, bx, n):
     [A, B] = def_update_matrices(epsilon, mu, sigma, delta_x, delta_y, delta_t, n)
 
     bx_term = -(delta_t/2)*np.divide(bx, np.multiply(mu, delta_y_matrix))
-    C_term = np.roll(bx_term, -1, 0) + bx_term - np.roll(np.roll(bx_term, -1, 0), 1, 1) - np.roll(bx_term, 1, 1)
-    
+    C_term_base = np.roll(bx_term, -1, 0) + bx_term - np.roll(np.roll(bx_term, -1, 0), 1, 1) - np.roll(bx_term, 1, 1)
+    C_term = np.concatenate((np.zeros((M, N)), C_term_base))
     # should be delta_y_star_matrix
     jz_n = -np.multiply(delta_y_matrix, jz[:,:,n])/4
     jz_nm1 = -np.multiply(delta_y_matrix, jz[:,:,n-1])/4
-    D_term = -np.roll(jz_n, -1, 0) - jz_n - np.roll(jz_nm1, -1, 0) - jz_nm1
+    D_term_base = -np.roll(jz_n, -1, 0) - jz_n - np.roll(jz_nm1, -1, 0) - jz_nm1
+    D_term = np.concatenate((np.zeros((M, N)), D_term_base))
 
     new_values = np.dot(linalg.inv(A), (np.dot(B, np.concatenate((ez_old, hy_old))) + C_term + D_term))
     ez_new = new_values[:M,:]
@@ -88,53 +91,50 @@ def def_update_matrices(epsilon, mu, sigma, delta_x, delta_y, delta_t, n):
     B = np.zeros((2*M, 2*M))
 
     for i in range(M):
-        for j in range(M):
-            #i = b // N
-            #j = b % N
-            b = N*i + j
-            if i != M-1:
-                A[i+1,j] = delta_y[0]/(2*delta_x[i])
-                A[i, j] = -delta_y[0]/(2*delta_x[i])
-                A[i+1,M+j] = -mu[i+1,0]/(2*delta_t)
-                A[i,M+j] = -mu[i,0]/(2*delta_t)
 
-                B[i+1,j] = -delta_y[0]/(2*delta_x[i])
-                B[i,j] = delta_y[0]/(2*delta_x[i])
-                B[i+1,M+j] = mu[i+1,0]/(2*delta_t)
-                B[i,M+j] = mu[i,0]/(2*delta_t)
+        if i != M-1:
+            A[i,i+1] = delta_y[0]/(2*delta_x[i])
+            A[i, i] = -delta_y[0]/(2*delta_x[i])
+            A[i,M+i+1] = -mu[i+1,0]/(2*delta_t)
+            A[i,M+i] = -mu[i,0]/(2*delta_t)
 
-                # delta_y should be delta_y*
-                A[M+i+1,j] = (epsilon[i+1,0]/(2*delta_t) + sigma[i+1,0]/4)*delta_y[0]
-                A[M+i,j] = (epsilon[i,0]/(2*delta_t) + sigma[i,0]/4)*delta_y[0]
-                A[M+i+1,M+j] = -1/(2*delta_x[i+1])
-                A[M+i,M+j] = 1/(2*delta_x[i])
+            B[i,i+1] = -delta_y[0]/(2*delta_x[i])
+            B[i,i] = delta_y[0]/(2*delta_x[i])
+            B[i,M+i+1] = mu[i+1,0]/(2*delta_t)
+            B[i,M+i] = mu[i,0]/(2*delta_t)
 
-                B[M+i+1,j] = (epsilon[i+1,0]/(2*delta_t) - sigma[i+1,0]/4)*delta_y[0]
-                B[M+i,j] = (epsilon[i,0]/(2*delta_t) - sigma[i,0]/4)*delta_y[0]
-                B[M+i+1,M+j] = 1/(2*delta_x[i+1])
-                B[M+i,M+j] = -1/(2*delta_x[i])
+            # delta_y should be delta_y*
+            A[M+i,i+1] = (epsilon[i+1,0]/(2*delta_t) + sigma[i+1,0]/4)*delta_y[0]
+            A[M+i,i] = (epsilon[i,0]/(2*delta_t) + sigma[i,0]/4)*delta_y[0]
+            A[M+i,M+i+1] = -1/(2*delta_x[i+1])
+            A[M+i,M+i] = 1/(2*delta_x[i])
 
-            else:
-                A[0,j] = delta_y[0]/(2*delta_x[i])
-                A[i, j] = -delta_y[0]/(2*delta_x[i])
-                A[0,M+j] = -mu[0,0]/(2*delta_t)
-                A[i,M+j] = -mu[i,0]/(2*delta_t)
+            B[M+i,i+1] = (epsilon[i+1,0]/(2*delta_t) - sigma[i+1,0]/4)*delta_y[0]
+            B[M+i,i] = (epsilon[i,0]/(2*delta_t) - sigma[i,0]/4)*delta_y[0]
+            B[M+i,M+i+1] = 1/(2*delta_x[i+1])
+            B[M+i,M+i] = -1/(2*delta_x[i])
 
-                B[0,j] = -delta_y[0]/(2*delta_x[i])
-                B[i,j] = delta_y[0]/(2*delta_x[i])
-                B[0,M+j] = mu[0,0]/(2*delta_t)
-                B[i,M+j] = mu[i,0]/(2*delta_t)
+        else:
+            A[i,0] = delta_y[0]/(2*delta_x[i])
+            A[i, i] = -delta_y[0]/(2*delta_x[i])
+            A[i,M] = -mu[0,0]/(2*delta_t)
+            A[i,M+i] = -mu[i,0]/(2*delta_t)
 
-                # delta_y should be delta_y*
-                A[M,j] = (epsilon[0,0]/(2*delta_t) + sigma[0,0]/4)*delta_y[0]
-                A[M+i,j] = (epsilon[i,0]/(2*delta_t) + sigma[i,0]/4)*delta_y[0]
-                A[M,M+j] = -1/(2*delta_x[0])
-                A[M+i,M+j] = 1/(2*delta_x[i])
+            B[i,0] = -delta_y[0]/(2*delta_x[i])
+            B[i,i] = delta_y[0]/(2*delta_x[i])
+            B[i,M] = mu[0,0]/(2*delta_t)
+            B[i,M+i] = mu[i,0]/(2*delta_t)
 
-                B[M,j] = (epsilon[0,0]/(2*delta_t) - sigma[0,0]/4)*delta_y[0]
-                B[M+i,j] = (epsilon[i,0]/(2*delta_t) - sigma[i,0]/4)*delta_y[0]
-                B[M,M+j] = 1/(2*delta_x[0])
-                B[M+i,M+j] = -1/(2*delta_x[i])
+            # delta_y should be delta_y*
+            A[M+i,0] = (epsilon[0,0]/(2*delta_t) + sigma[0,0]/4)*delta_y[0]
+            A[M+i,i] = (epsilon[i,0]/(2*delta_t) + sigma[i,0]/4)*delta_y[0]
+            A[M+i,M] = -1/(2*delta_x[0])
+            A[M+i,M+i] = 1/(2*delta_x[i])
+
+            B[M+i,0] = (epsilon[0,0]/(2*delta_t) - sigma[0,0]/4)*delta_y[0]
+            B[M+i,i] = (epsilon[i,0]/(2*delta_t) - sigma[i,0]/4)*delta_y[0]
+            B[M+i,M] = 1/(2*delta_x[0])
+            B[M+i,M+i] = -1/(2*delta_x[i])
     return [A, B]
 
 
@@ -143,19 +143,19 @@ def run():
     hy = np.zeros((M,N))
     bx = np.zeros((M,N))
 
-    bx_list = np.zeros((M,N, 100))
+    bx_list = np.zeros((M,N, iterations))
 
-    ez_list = np.zeros((iterations, len(observation_point_ez)))
+    ez_list = np.zeros((iterations, len(observation_points_ez)))
 
     E = def_explicit_update_matrix()
 
     for n in range(iterations):
         print(f'iteration {n+1}/{iterations} started')
         [ez, hy, bx] = step(ez, hy, bx, E, n)
-        bx_list[:,n] = bx
+        bx_list[:,:,n] = bx
 
-        for i, point in enumerate(observation_point_ez):
-            ez_list[n, i] = ez[point[1]*N + point[0]]
+        for i, point in enumerate(observation_points_ez):
+            ez_list[n, i] = ez[point]
 
     return bx_list, ez_list
 
@@ -170,9 +170,10 @@ jz = def_jz(modulated)
 
 [bx_list, ez_list] = run()
 
-plt.plot(range(50), ez_list[:,0])
-plt.show()
 
-
-plt.plot(range(40), ez_list[:-10,0])
-plt.show()
+for i, point in enumerate(observation_points_ez):
+    plt.plot(range(iterations), ez_list[:,i])
+    plt.xlabel('Time [s]')
+    plt.ylabel('Ez')
+    plt.title(f'Ez at {point}')
+    plt.show()
