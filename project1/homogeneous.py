@@ -12,7 +12,7 @@ c = 3*10**8
 M = 200
 N = 200
 
-iterations = 80
+iterations = 150
 
 #source should be either 'sine', 'gaussian_modulated', or 'gaussian'
 
@@ -66,7 +66,7 @@ def def_jz(source):
                 for j in range(N):
                     jz[i, j, n] = J0*np.sin(omega_c*n*delta_t)*np.exp(-(i**2 + j**2)/(2*sigma_source**2))
     elif source == 'dirac':
-        jz[M//2, N//2, 0] = 1/(delta_x[0]*delta_y[0])
+        jz[M//3, N//4, 0] = 1/(delta_x[0]*delta_y[0])
     return jz
 
 def update_bx(bx_old, ez_old, E):
@@ -80,7 +80,7 @@ def update_bx(bx_old, ez_old, E):
     bx[:,-1] = bx_old[:,-1] - (ez_old[:,0] - ez_old[:,-1]) # add periodic boundary condition
     return bx
 
-def update_implicit(ez_old, hy_old, bx, n, A, B):
+def update_implicit(ez_old, hy_old, bx, n, A_inv, B):
 
     bx_term = -(delta_t/2)*np.divide(bx, np.multiply(mu, delta_y_matrix))
     C_term_base = np.roll(bx_term, -1, 0) + bx_term - np.roll(np.roll(bx_term, -1, 0), 1, 1) - np.roll(bx_term, 1, 1)
@@ -91,7 +91,7 @@ def update_implicit(ez_old, hy_old, bx, n, A, B):
     D_term_base = np.roll(jz_n, -1, 0) + jz_n + np.roll(jz_nm1, -1, 0) + jz_nm1
     D_term = np.concatenate((np.zeros((M, N)), D_term_base))
 
-    new_values = np.dot(linalg.inv(A), (np.dot(B, np.concatenate((ez_old, hy_old))) + C_term + D_term))
+    new_values = np.dot(A_inv, (np.dot(B, np.concatenate((ez_old, hy_old))) + C_term + D_term))
     ez_new = new_values[:M,:]
     hy_new = new_values[M:,:]
     return [new_values[:M,:], new_values[M:,:]]
@@ -168,10 +168,10 @@ def run():
     E = def_explicit_update_matrix()
 
     [A, B] = def_update_matrices(epsilon, mu, sigma, delta_x, delta_y, delta_t)
-
+    A_inv = linalg.inv(A)
     for n in range(iterations):
         print(f'iteration {n+1}/{iterations} started')
-        [ez, hy, bx] = step(ez, hy, bx, E, A, B, n)
+        [ez, hy, bx] = step(ez, hy, bx, E, A_inv, B, n)
         bx_list[:,:,n] = bx
 
         for i, point in enumerate(observation_points_ez):
@@ -179,9 +179,9 @@ def run():
 
     return bx_list, ez_list
 
-def step(ez_old, hy_old, bx_old, E, A, B, n):
+def step(ez_old, hy_old, bx_old, E, A_inv, B, n):
     bx_new = update_bx(bx_old, ez_old, E)
-    [ez_new, hy_new] = update_implicit(ez_old, hy_old, bx_new, n, A, B)
+    [ez_new, hy_new] = update_implicit(ez_old, hy_old, bx_new, n, A_inv, B)
     return [ez_new, hy_new, bx_new]
 
 
@@ -214,8 +214,6 @@ plt.plot(d_list[10:-10], [i/2 for i in v_list[10:-10]], label = 'computationally
 plt.legend()
 plt.show()
 
-print(d_list)
-print(v_list)
 
 animation_speed = 5
 
