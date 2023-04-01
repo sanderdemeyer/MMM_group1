@@ -1,10 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
-
-a = np.array([[1, 2], [3, 4]])
-b = np.array([[5, 6], [7, 8]])
-c = np.concatenate((a, b))
-
+import scipy.special as special
+import numpy.fft as fft
 
 
 d = np.array([[0, 1, 2], [3, 4, 5], [6, 7, 8]])
@@ -51,3 +48,77 @@ print(A[(0, 1)])
 print(([(2, 2)]))
 
 print('fdjk' == 'fdsjqklm')
+
+def hankel(x):
+    return special.hankel2(0, x)
+
+d = np.linspace(0, 5*10**(1), 1000)
+mu = 1
+c = 1
+w = 1
+
+#plt.plot(d, -w*mu/4*hankel((w/c)*d))
+#plt.show()
+
+
+#print(fft.fft([1 for i in range(100)]))
+
+#%%
+
+epsilon_0 = 8.85*10**(-12)
+mu_0 = 1.25663706*10**(-6)
+c = 3*10**8
+M = 100
+N = 100
+
+iterations = 80
+
+#source should be either 'sine', 'gaussian_modulated', or 'gaussian'
+
+
+# last 'extra' element should be the same as the 0th.
+epsilon = np.ones((M,N))*epsilon_0
+mu = np.ones((M,N))*mu_0
+sigma = np.ones((M,N))*0
+
+delta_x = np.ones(M)*10**(-1)
+delta_y = np.ones(N)*10**(-1)
+delta_x_matrix = np.array([np.repeat(delta_x[i], N) for i in range(M)])
+delta_y_matrix = np.array([delta_y for i in range(M)])
+delta_t = 10**(-11)
+
+courant_number = 1
+delta_t = np.max(delta_y)/(c)*courant_number
+print(delta_t)
+
+source = 'sine'
+J0 = 1
+tc = 5
+sigma_source = 1
+period = 10
+omega_c = (2*np.pi)/(period*delta_t) # to have a period of 10 time steps
+
+jz = np.zeros((M, N, iterations))
+
+for n in range(iterations):
+    for i in range(M):
+        for j in range(N):
+            jz[i, j, n] = J0*np.sin(omega_c*n*delta_t)*np.exp(-(i**2 + j**2)/(2*sigma_source**2))
+
+fft_nd = fft.fftn(jz, axes = [2])
+
+plt.plot([i for i in range(80)], fft_nd[0,0,:], label = '2')
+plt.show()
+
+
+# inverse
+
+four = [J0 for i in range(iterations)]
+inverse = fft.ifft(four)
+
+print(inverse)
+plt.plot([i for i in range(80)], inverse, label = '2')
+plt.show()
+
+
+print(fft.fft([1] + [0 for i in range(iterations-1)]))

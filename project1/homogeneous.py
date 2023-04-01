@@ -2,37 +2,51 @@ import numpy as np
 import numpy.linalg as linalg
 import numpy.fft as fft
 import matplotlib.pyplot as plt
+import scipy.special as special
+from matplotlib.pyplot import pcolormesh
+from matplotlib.animation import FuncAnimation
 
 epsilon_0 = 8.85*10**(-12)
 mu_0 = 1.25663706*10**(-6)
+c = 3*10**8
+M = 200
+N = 200
 
-M = 30
-N = 30
+iterations = 80
 
-iterations = 400
+#source should be either 'sine', 'gaussian_modulated', or 'gaussian'
 
-source = 'sine'
-J0 = 1
-tc = 5
-sigma_source = 1
-omega_c = 20
 
 # last 'extra' element should be the same as the 0th.
 epsilon = np.ones((M,N))*epsilon_0
 mu = np.ones((M,N))*mu_0
 sigma = np.ones((M,N))*0
 
-delta_x = np.ones(M)*10**(-1)
-delta_y = np.ones(N)*10**(-1)
+delta_x = np.ones(M)*(5)*10**(-2)
+delta_y = np.ones(N)*(5)*10**(-2)
 delta_x_matrix = np.array([np.repeat(delta_x[i], N) for i in range(M)])
 delta_y_matrix = np.array([delta_y for i in range(M)])
 delta_t = 10**(-11)
 
 courant_number = 1
-delta_t = np.max(delta_y)/(3*10**8)*courant_number
+delta_t = np.max(delta_y)/(c)*courant_number
 print(delta_t)
 
+source = 'dirac'
+J0 = 1
+tc = 5
+sigma_source = 1
+period = 10
+omega_c = (2*np.pi)/(period*delta_t) # to have a period of 10 time steps
+
+# period for the wave to go around = 
+# T = delta_t*n = N delta_y / c
+# n = N delta_y/(c*delta_t) = N delta_y/(c*courant*delta_y/c) = N/courant
+
 observation_points_ez = [(15, 0), (0, 15), (15, 15)]
+
+#observation_points_ez = [(0, i) for i in range(M)]
+observation_points_ez = [(i, 0) for i in range(M)]
 
 def def_jz(source):
     jz = np.zeros((M, N, iterations))
@@ -51,6 +65,8 @@ def def_jz(source):
             for i in range(M):
                 for j in range(N):
                     jz[i, j, n] = J0*np.sin(omega_c*n*delta_t)*np.exp(-(i**2 + j**2)/(2*sigma_source**2))
+    elif source == 'dirac':
+        jz[M//2, N//2, 0] = 1/(delta_x[0]*delta_y[0])
     return jz
 
 def update_bx(bx_old, ez_old, E):
@@ -72,7 +88,7 @@ def update_implicit(ez_old, hy_old, bx, n, A, B):
     # should be delta_y_star_matrix
     jz_n = -np.multiply(delta_y_matrix, jz[:,:,n])/4
     jz_nm1 = -np.multiply(delta_y_matrix, jz[:,:,n-1])/4
-    D_term_base = -np.roll(jz_n, -1, 0) - jz_n - np.roll(jz_nm1, -1, 0) - jz_nm1
+    D_term_base = np.roll(jz_n, -1, 0) + jz_n + np.roll(jz_nm1, -1, 0) + jz_nm1
     D_term = np.concatenate((np.zeros((M, N)), D_term_base))
 
     new_values = np.dot(linalg.inv(A), (np.dot(B, np.concatenate((ez_old, hy_old))) + C_term + D_term))
@@ -102,18 +118,18 @@ def def_update_matrices(epsilon, mu, sigma, delta_x, delta_y, delta_t):
 
             B[i,i+1] = -delta_y[0]/(2*delta_x[i])
             B[i,i] = delta_y[0]/(2*delta_x[i])
-            B[i,M+i+1] = mu[i+1,0]/(2*delta_t)
-            B[i,M+i] = mu[i,0]/(2*delta_t)
+            B[i,M+i+1] = -mu[i+1,0]/(2*delta_t)
+            B[i,M+i] = -mu[i,0]/(2*delta_t)
 
             # delta_y should be delta_y*
             A[M+i,i+1] = (epsilon[i+1,0]/(2*delta_t) + sigma[i+1,0]/4)*delta_y[0]
             A[M+i,i] = (epsilon[i,0]/(2*delta_t) + sigma[i,0]/4)*delta_y[0]
-            A[M+i,M+i+1] = -1/(2*delta_x[i+1])
+            A[M+i,M+i+1] = -1/(2*delta_x[i])
             A[M+i,M+i] = 1/(2*delta_x[i])
 
             B[M+i,i+1] = (epsilon[i+1,0]/(2*delta_t) - sigma[i+1,0]/4)*delta_y[0]
             B[M+i,i] = (epsilon[i,0]/(2*delta_t) - sigma[i,0]/4)*delta_y[0]
-            B[M+i,M+i+1] = 1/(2*delta_x[i+1])
+            B[M+i,M+i+1] = 1/(2*delta_x[i])
             B[M+i,M+i] = -1/(2*delta_x[i])
 
         else:
@@ -124,18 +140,18 @@ def def_update_matrices(epsilon, mu, sigma, delta_x, delta_y, delta_t):
 
             B[i,0] = -delta_y[0]/(2*delta_x[i])
             B[i,i] = delta_y[0]/(2*delta_x[i])
-            B[i,M] = mu[0,0]/(2*delta_t)
-            B[i,M+i] = mu[i,0]/(2*delta_t)
+            B[i,M] = -mu[0,0]/(2*delta_t)
+            B[i,M+i] = -mu[i,0]/(2*delta_t)
 
             # delta_y should be delta_y*
             A[M+i,0] = (epsilon[0,0]/(2*delta_t) + sigma[0,0]/4)*delta_y[0]
             A[M+i,i] = (epsilon[i,0]/(2*delta_t) + sigma[i,0]/4)*delta_y[0]
-            A[M+i,M] = -1/(2*delta_x[0])
+            A[M+i,M] = -1/(2*delta_x[i])
             A[M+i,M+i] = 1/(2*delta_x[i])
 
             B[M+i,0] = (epsilon[0,0]/(2*delta_t) - sigma[0,0]/4)*delta_y[0]
             B[M+i,i] = (epsilon[i,0]/(2*delta_t) - sigma[i,0]/4)*delta_y[0]
-            B[M+i,M] = 1/(2*delta_x[0])
+            B[M+i,M] = 1/(2*delta_x[i])
             B[M+i,M+i] = -1/(2*delta_x[i])
     return [A, B]
 
@@ -175,13 +191,43 @@ jz = def_jz(source)
 [bx_list, ez_list] = run()
 
 
+def hankel(x):
+    return -(J0*omega_c*mu_0/4)*special.hankel2(0, (omega_c*x*delta_x[0]/c))
+
+d_list = []
+v_list = []
 for i, point in enumerate(observation_points_ez):
+    """
     plt.plot(range(iterations), ez_list[:,i])
     plt.xlabel('Time [s]')
     plt.ylabel('Ez')
     plt.title(f'Ez at {point}')
     plt.show()
-
+    """
     fft_transform = fft.fft(ez_list[:,i])
-    print(fft_transform)
+    #d_list.append(point[1])
+    d_list.append(point[0])
+    v_list.append(fft_transform[iterations//period])
 
+plt.plot(d_list[10:-10], [i/2 for i in v_list[10:-10]], label = 'computationally')
+#plt.plot(d_list, [hankel(x+1) for x in d_list], label = 'exact solution')
+plt.legend()
+plt.show()
+
+print(d_list)
+print(v_list)
+
+animation_speed = 5
+
+fig, ax = plt.subplots()
+ax.set_xlabel('X')
+ax.set_ylabel('Y')
+ax.set_aspect('equal', adjustable='box')
+
+def animate(i):
+   ax.pcolormesh(bx_list[:,:,int(i*animation_speed)])
+   ax.set_title(f'n = {int(i*animation_speed)}')
+
+
+anim = FuncAnimation(fig, animate)
+plt.show()
