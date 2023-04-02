@@ -9,8 +9,8 @@ from matplotlib.animation import FuncAnimation
 epsilon_0 = 8.85*10**(-12)
 mu_0 = 1.25663706*10**(-6)
 c = 3*10**8
-M = 200
-N = 200
+M = 100
+N = 100
 
 iterations = 150
 
@@ -22,11 +22,10 @@ epsilon = np.ones((M,N))*epsilon_0
 mu = np.ones((M,N))*mu_0
 sigma = np.ones((M,N))*0
 
-delta_x = np.ones(M)*(5)*10**(-2)
-delta_y = np.ones(N)*(5)*10**(-2)
+delta_x = np.ones(M)*10/M
+delta_y = np.ones(N)*10/N
 delta_x_matrix = np.array([np.repeat(delta_x[i], N) for i in range(M)])
 delta_y_matrix = np.array([delta_y for i in range(M)])
-delta_t = 10**(-11)
 
 courant_number = 1
 delta_t = np.max(delta_y)/(c)*courant_number
@@ -69,7 +68,7 @@ def def_jz(source):
         jz[M//3, N//4, 0] = 1/(delta_x[0]*delta_y[0])
     return jz
 
-def update_bx(bx_old, ez_old, E):
+def update_bx(bx_old, ez_old):
     #assumes arrays
     #bx = bx_old + np.dot(E, ez_old)
     #return bx
@@ -156,7 +155,7 @@ def def_update_matrices(epsilon, mu, sigma, delta_x, delta_y, delta_t):
     return [A, B]
 
 
-def run():
+def run_UCHIE():
     ez = np.zeros((M,N))
     hy = np.zeros((M,N))
     bx = np.zeros((M,N))
@@ -165,13 +164,11 @@ def run():
 
     ez_list = np.zeros((iterations, len(observation_points_ez)))
 
-    E = def_explicit_update_matrix()
-
     [A, B] = def_update_matrices(epsilon, mu, sigma, delta_x, delta_y, delta_t)
     A_inv = linalg.inv(A)
     for n in range(iterations):
         print(f'iteration {n+1}/{iterations} started')
-        [ez, hy, bx] = step(ez, hy, bx, E, A_inv, B, n)
+        [ez, hy, bx] = step(ez, hy, bx, A_inv, B, n)
         bx_list[:,:,n] = bx
 
         for i, point in enumerate(observation_points_ez):
@@ -179,8 +176,8 @@ def run():
 
     return bx_list, ez_list
 
-def step(ez_old, hy_old, bx_old, E, A_inv, B, n):
-    bx_new = update_bx(bx_old, ez_old, E)
+def step(ez_old, hy_old, bx_old, A_inv, B, n):
+    bx_new = update_bx(bx_old, ez_old)
     [ez_new, hy_new] = update_implicit(ez_old, hy_old, bx_new, n, A_inv, B)
     return [ez_new, hy_new, bx_new]
 
@@ -188,7 +185,7 @@ def step(ez_old, hy_old, bx_old, E, A_inv, B, n):
 jz = def_jz(source)
 
 
-[bx_list, ez_list] = run()
+[bx_list, ez_list] = run_UCHIE()
 
 
 def hankel(x):
@@ -215,7 +212,7 @@ plt.legend()
 plt.show()
 
 
-animation_speed = 5
+animation_speed = 1
 
 fig, ax = plt.subplots()
 ax.set_xlabel('X')

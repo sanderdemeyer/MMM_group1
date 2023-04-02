@@ -13,11 +13,11 @@ print(np.roll(d, 1, 1))
 print(np.roll(d, -1, 1))
 
 print(np.multiply(d, np.roll(d, 1, 0)))
-#1: laatste naar eerste
-#-1: eerste naar laatste
+#1: laatste naar eerste (voor i-1)
+#-1: eerste naar laatste (voor i+1)
 
-#0: behoud rijen, switch kolommen
-#1: behoud kolommen, switch rijen
+#0: behoud rijen, verander kolommen (voor i)
+#1: behoud kolommen, verander rijen (voor j)
 
 
 print(np.repeat(np.array([1, 2, 3, 4, 5]), 7, axis=0))
@@ -122,3 +122,9 @@ plt.show()
 
 
 print(fft.fft([1] + [0 for i in range(iterations-1)]))
+
+
+
+a = np.array([[1, 2], [3, 4]])
+print(a)
+print(np.divide(1, a))
