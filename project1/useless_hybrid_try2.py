@@ -68,7 +68,7 @@ delta_y_matrix_U = np.array([delta_y_U for i in range(M_U)])
 
 courant_number = 0.9
 
-delta_t = (courant_number/c)*min(np.max(delta_y_U), 1/(np.sqrt(1/(np.max(delta_x_Yee))**2 + 1/(np.max(delta_y_Yee))**2)))
+delta_t = (courant_number/c)*max(np.max(delta_y_U), 1/(np.sqrt(1/(np.max(delta_x_Yee))**2 + 1/(np.max(delta_y_Yee))**2)))
 
 eps_sigma_plus_U = epsilon_U/delta_t + sigma_U/2
 eps_sigma_min_U = epsilon_U/delta_t - sigma_U/2
@@ -101,80 +101,50 @@ bx_Yee_list = np.zeros((M_Yee, N_Yee, iterations))
 ez_Yee_list = np.zeros((M_Yee, N_Yee, iterations))
 hy_Yee_list = np.zeros((M_Yee, N_Yee, iterations))
 
+courant_number = 0.9
+delta_t = courant_number/(c*np.sqrt(1/(np.max(delta_x_Yee))**2 + 1/(np.max(delta_y_Yee))**2))
+
+
+eps_sigma_plus_Yee = epsilon_Yee/delta_t + sigma_Yee/2
+eps_sigma_min_Yee = epsilon_Yee/delta_t - sigma_Yee/2
+
+eq2_matrix = np.divide(delta_t, np.multiply(mu_Yee, delta_x_matrix_Yee))
+
+
+
+
 for n in range(iterations):
     print(f'iteration {n+1}/{iterations} started')
-
+    """
+    ez_old = copy.deepcopy(ez_new)
+    hy_old = copy.deepcopy(hy_new)
+    bx_old = copy.deepcopy(bx_new)
+    """
     ez_Yee_old = ez_Yee_new
     hy_Yee_old = hy_Yee_new
     bx_Yee_old = bx_Yee_new
 
-    ez_U_old = ez_U_new
-    hy_U_old = hy_U_new
-    bx_U_old = bx_U_new
-
-    # Update ez in Yee region
     eq_4_hy = np.divide(hy_Yee_old, delta_x_matrix_Yee)
     eq_4_bx = np.divide(bx_Yee_old, np.multiply(delta_y_matrix_Yee, mu_Yee))
     eq_4_term = np.multiply(eps_sigma_min_Yee, ez_Yee_old) - (jz_Yee[:,:,n]+jz_Yee[:,:,n-1])/2 + eq_4_hy - np.roll(eq_4_hy, 1, 0) - eq_4_bx + np.roll(eq_4_bx, 1, 1)
     ez_Yee_new = np.divide(eq_4_term, eps_sigma_plus_Yee)
 
-    # Ez and Hy implicitly updated in the UCHIE region
-    [ez_U_new, hy_U_new] = update_implicit(ez_U_old, hy_U_old, bx_U_old, n, A_inv, B, delta_t, delta_y_matrix_U, M_U, N_U, jz_U, mu_U)
-
-    # Bx explicitly updated in the UCHIE region (interpolation needed)
-    bx_U_new = np.zeros((M_U, N_U))
-    bx_U_new[:,1:-1] = bx_U_old[:,1:-1] - (ez_U_old[:,2:] - ez_U_old[:,1:-1])
-    bx_U_new[:,-1] = bx_U_old[:,-1] - (np.dot(interpolate_matrix, ez_Yee_old[U_x_left:U_x_right+1,U_y_top+1]) - ez_U_old[:,-1]) # add periodic boundary condition
-    # ez_U[:,0] does not exist, or equivalently, is always zero.
-    bx_U_new[:,0] = bx_U_old[:,0] - (ez_U_old[:,1] - np.dot(interpolate_matrix, ez_Yee_old[U_x_left:U_x_right+1,U_y_bottom])) # add periodic boundary condition
-
-    # Bx is explicitly updated in the Yee region
     eq_3_term = np.divide(ez_Yee_new*delta_t, delta_y_matrix_Yee)
     bx_Yee_new = bx_Yee_old - np.roll(eq_3_term, -1, 1) + eq_3_term
-
-    # Hy is explicitly updated in the Yee region
+    
     eq_2_term = np.multiply(eq2_matrix, ez_Yee_new)
     hy_Yee_new = hy_Yee_old + np.roll(eq_2_term, -1, 0) - eq_2_term
-
-
-    """
-    term2_plus = delta_x_Yee[U_x_right]*(np.divide(bx_U_new[-1,U_y_bottom+1:U_y_top], 2*np.multiply(mu_Yee[U_x_right,U_y_bottom+1:U_y_top], delta_y_Yee[U_y_bottom+1:U_y_top])))
-    term2_min = -delta_x_Yee[U_x_right]*(np.divide(bx_U_new[-1,U_y_bottom:U_y_top-1], 2*np.multiply(mu_Yee[U_x_right,U_y_bottom:U_y_top-1], delta_y_Yee[U_y_bottom:U_y_top-1])))
-    term3 = np.multiply(delta_x_Yee[U_x_right]/2, np.multiply(epsilon_Yee[U_x_right,U_y_bottom+1:U_y_top]/delta_t + sigma_Yee[U_x_right,U_y_bottom+1:U_y_top]/2, ez_U_new[-1,U_y_bottom+1:U_y_top]))
-    term4 = -np.multiply(delta_x_Yee[U_x_right]/2, np.multiply(epsilon_Yee[U_x_right,U_y_bottom+1:U_y_top]/delta_t - sigma_Yee[U_x_right,U_y_bottom+1:U_y_top]/2, ez_U_old[-1,U_y_bottom+1:U_y_top]))
-    term5 = np.multiply(delta_x_Yee[U_x_right]/4, jz_U[-1,U_y_bottom+1:U_y_top,n] + jz_U[-1,U_y_bottom+1:U_y_top,n-1])
-    """
-
-    term1 = (hy_U_new[-1,1:] + hy_U_old[-1,1:])/2
-    term2_plus = delta_x_Yee[U_x_right]*(np.divide(bx_U_new[-1,1:], 2*np.multiply(mu_Yee[U_x_right,U_y_bottom+1:U_y_top], delta_y_Yee[U_y_bottom+1:U_y_top])))
-    term2_min = -delta_x_Yee[U_x_right]*(np.divide(bx_U_new[-1,:-1], 2*np.multiply(mu_Yee[U_x_right,U_y_bottom:U_y_top-1], delta_y_Yee[U_y_bottom:U_y_top-1])))
-    term3 = np.multiply(delta_x_Yee[U_x_right]/2, np.multiply(epsilon_Yee[U_x_right,U_y_bottom+1:U_y_top]/delta_t + sigma_Yee[U_x_right,U_y_bottom+1:U_y_top]/2, ez_U_new[-1,1:]))
-    term4 = -np.multiply(delta_x_Yee[U_x_right]/2, np.multiply(epsilon_Yee[U_x_right,U_y_bottom+1:U_y_top]/delta_t - sigma_Yee[U_x_right,U_y_bottom+1:U_y_top]/2, ez_U_old[-1,1:]))
-    term5 = np.multiply(delta_x_Yee[U_x_right]/4, jz_U[-1,1:,n] + jz_U[-1,1:,n-1])
-
-    hy_Yee_new[U_x_right,U_y_bottom+1:U_y_top] = term1 + term2_plus + term2_min + term3 + term4 + term5
-
-    term1 = (hy_U_new[0,1:] + hy_U_old[0,1:])/2
-    term2_plus = -delta_x_Yee[U_x_left]*(np.divide(bx_U_new[0,1:], 2*np.multiply(mu_Yee[U_x_left,U_y_bottom+1:U_y_top], delta_y_Yee[U_y_bottom+1:U_y_top])))
-    term2_min = delta_x_Yee[U_x_left]*(np.divide(bx_U_new[0,:-1], 2*np.multiply(mu_Yee[U_x_left,U_y_bottom:U_y_top-1], delta_y_Yee[U_y_bottom:U_y_top-1])))
-    term3 = -np.multiply(delta_x_Yee[U_x_left]/2, np.multiply(epsilon_Yee[U_x_left,U_y_bottom+1:U_y_top]/delta_t + sigma_Yee[U_x_left,U_y_bottom+1:U_y_top]/2, ez_U_new[0,1:]))
-    term4 = np.multiply(delta_x_Yee[U_x_left]/2, np.multiply(epsilon_Yee[U_x_left,U_y_bottom+1:U_y_top]/delta_t - sigma_Yee[U_x_left,U_y_bottom+1:U_y_top]/2, ez_U_old[0,1:]))
-    term5 = -np.multiply(delta_x_Yee[U_x_left]/4, jz_U[0,1:,n] + jz_U[0,1:,n-1])
-
-    hy_Yee_new[U_x_left-1,U_y_bottom+1:U_y_top] = term1 + term2_plus + term2_min + term3 + term4 + term5
-
 
     bx_Yee_list[:,:,n] = bx_Yee_new
     ez_Yee_list[:,:,n] = ez_Yee_new
     hy_Yee_list[:,:,n] = hy_Yee_new
 
 
-
 animation_speed = 1
 
 fig, ax = plt.subplots()
-ax.set_xlabel('Y')
-ax.set_ylabel('X')
+ax.set_xlabel('X')
+ax.set_ylabel('Y')
 ax.set_aspect('equal', adjustable='box')
 
 def animate(i):

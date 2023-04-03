@@ -6,6 +6,14 @@ import numpy.fft as fft
 
 d = np.array([[0, 1, 2], [3, 4, 5], [6, 7, 8]])
 
+dflat = d.flatten()/8
+print((dflat))
+
+print(np.transpose([dflat, 1-dflat]))
+
+
+assert 0 == 1
+
 print(d)
 print(np.roll(d, 1, 0))
 print(np.roll(d, -1, 0))

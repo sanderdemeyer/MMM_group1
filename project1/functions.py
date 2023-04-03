@@ -1,9 +1,11 @@
 import numpy as np
 
 def def_jz(source, M, N, iterations, delta_value):
-    J0 = 0
+    J0 = 1
     jz = np.zeros((M, N, iterations))
-    if source == 'gaussian_modulated':
+    if source == 0:
+        return jz
+    elif source == 'gaussian_modulated':
         tc = 5
         sigma_source = 1
         for n in range(iterations):
@@ -84,3 +86,19 @@ def def_update_matrices(epsilon, mu, sigma, delta_x, delta_y, delta_t, M):
             B[M+i,M] = 1/(2*delta_x[i])
             B[M+i,M+i] = -1/(2*delta_x[i])
     return [A, B]
+
+def update_implicit(ez_old, hy_old, bx, n, A_inv, B, delta_t, delta_y_matrix, M, N, jz, mu):
+
+    bx_term = -(delta_t/2)*np.divide(bx, np.multiply(mu, delta_y_matrix))
+    C_term_base = np.roll(bx_term, -1, 0) + bx_term - np.roll(np.roll(bx_term, -1, 0), 1, 1) - np.roll(bx_term, 1, 1)
+    C_term = np.concatenate((np.zeros((M, N)), C_term_base))
+    # should be delta_y_star_matrix
+    jz_n = -np.multiply(delta_y_matrix, jz[:,:,n])/4
+    jz_nm1 = -np.multiply(delta_y_matrix, jz[:,:,n-1])/4
+    D_term_base = np.roll(jz_n, -1, 0) + jz_n + np.roll(jz_nm1, -1, 0) + jz_nm1
+    D_term = np.concatenate((np.zeros((M, N)), D_term_base))
+
+    new_values = np.dot(A_inv, (np.dot(B, np.concatenate((ez_old, hy_old))) + C_term + D_term))
+    ez_new = new_values[:M,:]
+    hy_new = new_values[M:,:]
+    return [new_values[:M,:], new_values[M:,:]]

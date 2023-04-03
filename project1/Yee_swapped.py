@@ -89,16 +89,16 @@ for n in range(iterations):
     hy_old = hy_new
     bx_old = bx_new
 
-    eq_2_term = np.multiply(eq2_matrix, ez_old)
-    hy_new = hy_old + np.roll(eq_2_term, -1, 0) - eq_2_term
-
-    eq_3_term = np.divide(ez_old*delta_t, delta_y_matrix)
-    bx_new = bx_old - np.roll(eq_3_term, -1, 1) + eq_3_term
-    
-    eq_4_hy = np.divide(hy_new, delta_x_matrix)
-    eq_4_bx = np.divide(bx_new, np.multiply(delta_y_matrix, mu))
+    eq_4_hy = np.divide(hy_old, delta_x_matrix)
+    eq_4_bx = np.divide(bx_old, np.multiply(delta_y_matrix, mu))
     eq_4_term = np.multiply(eps_sigma_min, ez_old) - (jz[:,:,n]+jz[:,:,n-1])/2 + eq_4_hy - np.roll(eq_4_hy, 1, 0) - eq_4_bx + np.roll(eq_4_bx, 1, 1)
     ez_new = np.divide(eq_4_term, eps_sigma_plus)
+
+    eq_3_term = np.divide(ez_new*delta_t, delta_y_matrix)
+    bx_new = bx_old - np.roll(eq_3_term, -1, 1) + eq_3_term
+    
+    eq_2_term = np.multiply(eq2_matrix, ez_new)
+    hy_new = hy_old + np.roll(eq_2_term, -1, 0) - eq_2_term
 
     bx_list[:,:,n] = bx_new
     ez_list[:,:,n] = ez_new
