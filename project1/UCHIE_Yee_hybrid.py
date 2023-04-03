@@ -101,6 +101,10 @@ bx_Yee_list = np.zeros((M_Yee, N_Yee, iterations))
 ez_Yee_list = np.zeros((M_Yee, N_Yee, iterations))
 hy_Yee_list = np.zeros((M_Yee, N_Yee, iterations))
 
+bx_U_list = np.zeros((M_U, N_U, iterations))
+ez_U_list = np.zeros((M_U, N_U, iterations))
+hy_U_list = np.zeros((M_U, N_U, iterations))
+
 for n in range(iterations):
     print(f'iteration {n+1}/{iterations} started')
 
@@ -117,6 +121,16 @@ for n in range(iterations):
     eq_4_bx = np.divide(bx_Yee_old, np.multiply(delta_y_matrix_Yee, mu_Yee))
     eq_4_term = np.multiply(eps_sigma_min_Yee, ez_Yee_old) - (jz_Yee[:,:,n]+jz_Yee[:,:,n-1])/2 + eq_4_hy - np.roll(eq_4_hy, 1, 0) - eq_4_bx + np.roll(eq_4_bx, 1, 1)
     ez_Yee_new = np.divide(eq_4_term, eps_sigma_plus_Yee)
+
+    ez_U_old[0,:] = ez_Yee_new[U_x_left,U_y_bottom:U_y_top]
+    ez_U_old[-1,:] = ez_Yee_new[U_x_right,U_y_bottom:U_y_top]
+
+    bx_U_old[0,:] = bx_Yee_new[U_x_left,U_y_bottom:U_y_top]
+    bx_U_old[-1,:] = bx_Yee_new[U_x_right,U_y_bottom:U_y_top]
+
+    hy_U_old[0,:] = hy_Yee_new[U_x_left,U_y_bottom:U_y_top]
+    hy_U_old[-1,:] = hy_Yee_new[U_x_right,U_y_bottom:U_y_top]
+
 
     # Ez and Hy implicitly updated in the UCHIE region
     [ez_U_new, hy_U_new] = update_implicit(ez_U_old, hy_U_old, bx_U_old, n, A_inv, B, delta_t, delta_y_matrix_U, M_U, N_U, jz_U, mu_U)
@@ -163,12 +177,40 @@ for n in range(iterations):
 
     hy_Yee_new[U_x_left-1,U_y_bottom+1:U_y_top] = term1 + term2_plus + term2_min + term3 + term4 + term5
 
+    hy_Yee_new[U_x_left:U_x_right,U_y_bottom:U_y_top] = np.zeros((U_Yee, N_U))
+
+    hy_Yee_new[U_x_left,U_y_bottom:U_y_top] = hy_U_new[0,:]
+    hy_Yee_new[U_x_right,U_y_bottom:U_y_top] = hy_U_new[-1,:]
+    for i in range(U_Yee):
+        hy_Yee_new[U_x_left+i, U_y_bottom] = hy_U_new[M_U_separate_cumsumlist[i],0]
+        hy_Yee_new[U_x_left+i, U_y_top] = hy_U_new[M_U_separate_cumsumlist[i],-1]
+    hy_Yee_new[U_x_right, U_y_bottom] = hy_U_new[M_U_separate_cumsumlist[-1]-1,0]
+    hy_Yee_new[U_x_right, U_y_top] = hy_U_new[M_U_separate_cumsumlist[-1]-1,-1]
+
+    ez_Yee_new[U_x_left,U_y_bottom:U_y_top] = ez_U_new[0,:]
+    ez_Yee_new[U_x_right,U_y_bottom:U_y_top] = ez_U_new[-1,:]
+    for i in range(U_Yee):
+        ez_Yee_new[U_x_left+i, U_y_bottom] = ez_U_new[M_U_separate_cumsumlist[i],0]
+        ez_Yee_new[U_x_left+i, U_y_top] = ez_U_new[M_U_separate_cumsumlist[i],-1]
+    ez_Yee_new[U_x_right, U_y_bottom] = ez_U_new[M_U_separate_cumsumlist[-1]-1,0]
+    ez_Yee_new[U_x_right, U_y_top] = ez_U_new[M_U_separate_cumsumlist[-1]-1,-1]
+
+    bx_Yee_new[U_x_left,U_y_bottom:U_y_top] = bx_U_new[0,:]
+    bx_Yee_new[U_x_right,U_y_bottom:U_y_top] = bx_U_new[-1,:]
+    for i in range(U_Yee):
+        bx_Yee_new[U_x_left+i, U_y_bottom] = bx_U_new[M_U_separate_cumsumlist[i],0]
+        bx_Yee_new[U_x_left+i, U_y_top] = bx_U_new[M_U_separate_cumsumlist[i],-1]
+    bx_Yee_new[U_x_right, U_y_bottom] = bx_U_new[M_U_separate_cumsumlist[-1]-1,0]
+    bx_Yee_new[U_x_right, U_y_top] = bx_U_new[M_U_separate_cumsumlist[-1]-1,-1]
+
 
     bx_Yee_list[:,:,n] = bx_Yee_new
     ez_Yee_list[:,:,n] = ez_Yee_new
     hy_Yee_list[:,:,n] = hy_Yee_new
 
-
+    bx_U_list[:,:,n] = bx_U_new
+    ez_U_list[:,:,n] = ez_U_new
+    hy_U_list[:,:,n] = hy_U_new
 
 animation_speed = 1
 
@@ -179,6 +221,19 @@ ax.set_aspect('equal', adjustable='box')
 
 def animate(i):
    ax.pcolormesh(bx_Yee_list[:,:,int(i*animation_speed)])
+   ax.set_title(f'n = {int(i*animation_speed)}')
+
+
+anim = FuncAnimation(fig, animate)
+plt.show()
+
+fig, ax = plt.subplots()
+ax.set_xlabel('Y')
+ax.set_ylabel('X')
+ax.set_aspect('equal', adjustable='box')
+
+def animate(i):
+   ax.pcolormesh(bx_U_list[:,:,int(i*animation_speed)])
    ax.set_title(f'n = {int(i*animation_speed)}')
 
 

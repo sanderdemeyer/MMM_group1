@@ -161,8 +161,10 @@ def run_UCHIE():
     bx = np.zeros((M,N))
 
     bx_list = np.zeros((M,N, iterations))
+    ez_list = np.zeros((M,N, iterations))
+    hy_list = np.zeros((M,N, iterations))
 
-    ez_list = np.zeros((iterations, len(observation_points_ez)))
+    ez_list_observe = np.zeros((iterations, len(observation_points_ez)))
 
     [A, B] = def_update_matrices(epsilon, mu, sigma, delta_x, delta_y, delta_t)
     A_inv = linalg.inv(A)
@@ -170,11 +172,13 @@ def run_UCHIE():
         print(f'iteration {n+1}/{iterations} started')
         [ez, hy, bx] = step(ez, hy, bx, A_inv, B, n)
         bx_list[:,:,n] = bx
+        ez_list[:,:,n] = ez
+        hy_list[:,:,n] = hy
 
         for i, point in enumerate(observation_points_ez):
-            ez_list[n, i] = ez[point]
+            ez_list_observe[n, i] = ez[point]
 
-    return bx_list, ez_list
+    return bx_list, ez_list, hy_list, ez_list_observe
 
 def step(ez_old, hy_old, bx_old, A_inv, B, n):
     bx_new = update_bx(bx_old, ez_old)
@@ -185,7 +189,7 @@ def step(ez_old, hy_old, bx_old, A_inv, B, n):
 jz = def_jz(source)
 
 
-[bx_list, ez_list] = run_UCHIE()
+[bx_list, ez_list, hy_list, ez_list_observe] = run_UCHIE()
 
 
 def hankel(x):
@@ -201,7 +205,7 @@ for i, point in enumerate(observation_points_ez):
     plt.title(f'Ez at {point}')
     plt.show()
     """
-    fft_transform = fft.fft(ez_list[:,i])
+    fft_transform = fft.fft(ez_list_observe[:,i])
     #d_list.append(point[1])
     d_list.append(point[0])
     v_list.append(fft_transform[iterations//period])
@@ -223,6 +227,10 @@ def animate(i):
    ax.pcolormesh(bx_list[:,:,int(i*animation_speed)])
    ax.set_title(f'n = {int(i*animation_speed)}')
 
+
+print(bx_list[:,:,10])
+print(ez_list[:,:,10])
+print(hy_list[:,:,10])
 
 anim = FuncAnimation(fig, animate)
 plt.show()

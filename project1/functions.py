@@ -65,23 +65,23 @@ def def_update_matrices(epsilon, mu, sigma, delta_x, delta_y, delta_t, M):
             B[M+i,M+i] = -1/(2*delta_x[i])
 
         else:
-            A[i,0] = delta_y[0]/(2*delta_x[i])
+      #      A[i,0] = delta_y[0]/(2*delta_x[i])
             A[i, i] = -delta_y[0]/(2*delta_x[i])
             A[i,M] = -mu[0,0]/(2*delta_t)
             A[i,M+i] = -mu[i,0]/(2*delta_t)
 
-            B[i,0] = -delta_y[0]/(2*delta_x[i])
+      #      B[i,0] = -delta_y[0]/(2*delta_x[i])
             B[i,i] = delta_y[0]/(2*delta_x[i])
             B[i,M] = -mu[0,0]/(2*delta_t)
             B[i,M+i] = -mu[i,0]/(2*delta_t)
 
             # delta_y should be delta_y*
-            A[M+i,0] = (epsilon[0,0]/(2*delta_t) + sigma[0,0]/4)*delta_y[0]
+      #      A[M+i,0] = (epsilon[0,0]/(2*delta_t) + sigma[0,0]/4)*delta_y[0]
             A[M+i,i] = (epsilon[i,0]/(2*delta_t) + sigma[i,0]/4)*delta_y[0]
             A[M+i,M] = -1/(2*delta_x[i])
             A[M+i,M+i] = 1/(2*delta_x[i])
 
-            B[M+i,0] = (epsilon[0,0]/(2*delta_t) - sigma[0,0]/4)*delta_y[0]
+      #      B[M+i,0] = (epsilon[0,0]/(2*delta_t) - sigma[0,0]/4)*delta_y[0]
             B[M+i,i] = (epsilon[i,0]/(2*delta_t) - sigma[i,0]/4)*delta_y[0]
             B[M+i,M] = 1/(2*delta_x[i])
             B[M+i,M+i] = -1/(2*delta_x[i])
