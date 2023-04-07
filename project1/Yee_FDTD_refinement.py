@@ -53,7 +53,7 @@ class Yee_FDTD:
         self.epsilon_r[i_lower+1:i_upper+1,j_lower+1:j_upper+1]=epsilon_r
         self.mu_r[i_lower+1:i_upper+1,j_lower+1:j_upper+1]=mu_r
         
-    def add_refinement(self,n_cells_y,N_original, N_replacement, x_lower,x_upper,y_lower,y_upper,epsilon_r,mu_r):
+    def add_refinement(self,epsilon_r,mu_r,n_cells_y,N_original, N_replacement, x_lower,x_upper,y_lower,y_upper):
         #adds nomber of refined N_r new cells instead of the orginal cells N_o at location of dielectricum 
         self.mesh.add_refinement(N_original, N_replacement, x_lower,x_upper)
         
