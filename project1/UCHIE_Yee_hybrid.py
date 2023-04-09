@@ -6,7 +6,7 @@ import scipy.special as special
 from matplotlib.pyplot import pcolormesh
 from matplotlib.animation import FuncAnimation
 
-from functions import def_jz, def_update_matrices, update_implicit
+from functions import def_jz, def_update_matrices, def_update_matrices_hybrid, update_implicit, update_implicit_hybrid
 
 epsilon_0 = 8.85*10**(-12)
 mu_0 = 1.25663706*10**(-6)
@@ -18,18 +18,25 @@ iterations = 150
 
 # Define UCHIE region
 # Define the 4 edges of the region
-U_x_left = 47
-U_x_right = 50
-U_y_top = 90
+U_x_left = 20
+U_x_right = 80
+U_y_top = 80
 U_y_bottom = 20
 # Define how many layers in the x-direction the UCHIE region has (and y-direction, specified by the above)
 U_Yee = U_x_right - U_x_left
-M_U_separate = [10, 10, 10]
+M_U_separate = [5 for i in range(U_Yee)]
 M_U = sum(M_U_separate)
+N_U = U_y_top - U_y_bottom
+
+# Define the location of the source
+
+source_X_U = M_U//3
+source_Y_U = N_U//3
+source_X_Yee = M_Yee//2
+source_Y_Yee = 5
 
 assert len(M_U_separate) == U_Yee, 'Length of M_U should be the same number as the number of Yee cells incompassed in the UCHIE region'
 
-N_U = U_y_top - U_y_bottom
 
 epsilon_Yee = np.ones((M_Yee,N_Yee))*epsilon_0
 mu_Yee = np.ones((M_Yee,N_Yee))*mu_0
@@ -88,13 +95,16 @@ hy_U_new = np.zeros((M_U, N_U))
 bx_U_new = np.zeros((M_U, N_U))
 
 source = 'dirac'
-jz_U = def_jz(0, M_U, N_U, iterations, 1/(delta_x_U[0]*delta_y_U[0]))
-jz_Yee = def_jz(source, M_Yee, N_Yee, iterations, 1/(delta_x_Yee[0]*delta_y_Yee[0]))
+jz_U = def_jz(0, M_U, N_U, source_X_U, source_Y_U, iterations, 1/(delta_x_U[0]*delta_y_U[0]))
+jz_Yee = def_jz(source, M_Yee, N_Yee, source_X_Yee, source_Y_Yee, iterations, 1/(delta_x_Yee[0]*delta_y_Yee[0]))
 
 print(f'jz_U = {np.sum(jz_U)}')
 print(f'jz_Yee = {np.sum(jz_Yee)}')
 
 [A, B] = def_update_matrices(epsilon_U, mu_U, sigma_U, delta_x_U, delta_y_U, delta_t, M_U)
+delta_x_Yee_left = delta_x_Yee[U_x_left]
+delta_x_Yee_right = delta_x_Yee[U_x_right]
+#[A, B] = def_update_matrices_hybrid(epsilon_U, mu_U, sigma_U, delta_x_U, delta_y_U, delta_t, M_U, delta_x_Yee_left, delta_x_Yee_right)
 A_inv = linalg.inv(A)
 
 bx_Yee_list = np.zeros((M_Yee, N_Yee, iterations))
@@ -104,6 +114,7 @@ hy_Yee_list = np.zeros((M_Yee, N_Yee, iterations))
 bx_U_list = np.zeros((M_U, N_U, iterations))
 ez_U_list = np.zeros((M_U, N_U, iterations))
 hy_U_list = np.zeros((M_U, N_U, iterations))
+
 
 for n in range(iterations):
     print(f'iteration {n+1}/{iterations} started')
@@ -122,6 +133,7 @@ for n in range(iterations):
     eq_4_term = np.multiply(eps_sigma_min_Yee, ez_Yee_old) - (jz_Yee[:,:,n]+jz_Yee[:,:,n-1])/2 + eq_4_hy - np.roll(eq_4_hy, 1, 0) - eq_4_bx + np.roll(eq_4_bx, 1, 1)
     ez_Yee_new = np.divide(eq_4_term, eps_sigma_plus_Yee)
 
+    """
     ez_U_old[0,:] = ez_Yee_new[U_x_left,U_y_bottom:U_y_top]
     ez_U_old[-1,:] = ez_Yee_new[U_x_right,U_y_bottom:U_y_top]
 
@@ -130,17 +142,52 @@ for n in range(iterations):
 
     hy_U_old[0,:] = hy_Yee_new[U_x_left,U_y_bottom:U_y_top]
     hy_U_old[-1,:] = hy_Yee_new[U_x_right,U_y_bottom:U_y_top]
-
+    """
 
     # Ez and Hy implicitly updated in the UCHIE region
     [ez_U_new, hy_U_new] = update_implicit(ez_U_old, hy_U_old, bx_U_old, n, A_inv, B, delta_t, delta_y_matrix_U, M_U, N_U, jz_U, mu_U)
+    Hy_Yee_left = hy_Yee_new[U_x_left,U_y_bottom:U_y_top]
+    Hy_Yee_right = hy_Yee_new[U_x_right,U_y_bottom:U_y_top]
+    Ez_Yee_left = ez_Yee_new[U_x_left,U_y_bottom:U_y_top]
+    Ez_Yee_right = ez_Yee_new[U_x_right,U_y_bottom:U_y_top]
+
+
+    #[ez_U_new, hy_U_new] = update_implicit_hybrid(ez_U_old, hy_U_old, bx_U_old, n, A_inv, B, delta_t, delta_y_matrix_U, M_U, N_U, jz_U, mu_U, delta_x_Yee_left, delta_x_Yee_right, Hy_Yee_left, Hy_Yee_right, Ez_Yee_left, Ez_Yee_right)
 
     # Bx explicitly updated in the UCHIE region (interpolation needed)
+
     bx_U_new = np.zeros((M_U, N_U))
-    bx_U_new[:,1:-1] = bx_U_old[:,1:-1] - (ez_U_old[:,2:] - ez_U_old[:,1:-1])
-    bx_U_new[:,-1] = bx_U_old[:,-1] - (np.dot(interpolate_matrix, ez_Yee_old[U_x_left:U_x_right+1,U_y_top+1]) - ez_U_old[:,-1]) # add periodic boundary condition
+    bx_U_new[:,1:-1] = bx_U_old[:,1:-1] - (ez_U_new[:,2:] - ez_U_new[:,1:-1])
+    bx_U_new[:,-1] = bx_U_old[:,-1] - (np.dot(interpolate_matrix, ez_Yee_new[U_x_left:U_x_right+1,U_y_top+1]) - ez_U_new[:,-1]) # add periodic boundary condition
     # ez_U[:,0] does not exist, or equivalently, is always zero.
-    bx_U_new[:,0] = bx_U_old[:,0] - (ez_U_old[:,1] - np.dot(interpolate_matrix, ez_Yee_old[U_x_left:U_x_right+1,U_y_bottom])) # add periodic boundary condition
+    bx_U_new[:,0] = bx_U_old[:,0] - (ez_U_new[:,1] - np.dot(interpolate_matrix, ez_Yee_new[U_x_left:U_x_right+1,U_y_bottom])) # add periodic boundary condition
+
+    """ 
+    #Should be executed, but does not work yet.
+    # Change the edges of the Yee-region: equate the bx-values around the UCHIE box and the ez-values on the left and right side to the just updated UCHIE values.
+    ez_Yee_new[U_x_left,U_y_bottom:U_y_top] = ez_U_new[0,:]
+    ez_Yee_new[U_x_right,U_y_bottom:U_y_top] = ez_U_new[-1,:]
+
+    bx_Yee_old[U_x_left,U_y_bottom:U_y_top] = bx_U_new[0,:]
+    bx_Yee_old[U_x_right,U_y_bottom:U_y_top] = bx_U_new[-1,:]
+    for i in range(U_Yee):
+        bx_Yee_old[U_x_left+i, U_y_bottom] = bx_U_new[M_U_separate_cumsumlist[i],0]
+        bx_Yee_old[U_x_left+i, U_y_top] = bx_U_new[M_U_separate_cumsumlist[i],-1]
+   # bx_Yee_old[U_x_right, U_y_bottom] = bx_U_new[M_U_separate_cumsumlist[-1]-1,0]
+   # bx_Yee_old[U_x_right, U_y_top] = bx_U_new[M_U_separate_cumsumlist[-1]-1,-1]
+    """
+
+
+
+    """ wrong, I think
+    bx_Yee_new[U_x_left,U_y_bottom:U_y_top] = bx_U_new[0,:]
+    bx_Yee_new[U_x_right,U_y_bottom:U_y_top] = bx_U_new[-1,:]
+    for i in range(U_Yee):
+        bx_Yee_new[U_x_left+i, U_y_bottom] = bx_U_new[M_U_separate_cumsumlist[i],0]
+        bx_Yee_new[U_x_left+i, U_y_top] = bx_U_new[M_U_separate_cumsumlist[i],-1]
+    bx_Yee_new[U_x_right, U_y_bottom] = bx_U_new[M_U_separate_cumsumlist[-1]-1,0]
+    bx_Yee_new[U_x_right, U_y_top] = bx_U_new[M_U_separate_cumsumlist[-1]-1,-1]
+    """
 
     # Bx is explicitly updated in the Yee region
     eq_3_term = np.divide(ez_Yee_new*delta_t, delta_y_matrix_Yee)
@@ -151,14 +198,17 @@ for n in range(iterations):
     hy_Yee_new = hy_Yee_old + np.roll(eq_2_term, -1, 0) - eq_2_term
 
 
-    """
+
+
+
+    """ weird shit. Probably wrong
     term2_plus = delta_x_Yee[U_x_right]*(np.divide(bx_U_new[-1,U_y_bottom+1:U_y_top], 2*np.multiply(mu_Yee[U_x_right,U_y_bottom+1:U_y_top], delta_y_Yee[U_y_bottom+1:U_y_top])))
     term2_min = -delta_x_Yee[U_x_right]*(np.divide(bx_U_new[-1,U_y_bottom:U_y_top-1], 2*np.multiply(mu_Yee[U_x_right,U_y_bottom:U_y_top-1], delta_y_Yee[U_y_bottom:U_y_top-1])))
     term3 = np.multiply(delta_x_Yee[U_x_right]/2, np.multiply(epsilon_Yee[U_x_right,U_y_bottom+1:U_y_top]/delta_t + sigma_Yee[U_x_right,U_y_bottom+1:U_y_top]/2, ez_U_new[-1,U_y_bottom+1:U_y_top]))
     term4 = -np.multiply(delta_x_Yee[U_x_right]/2, np.multiply(epsilon_Yee[U_x_right,U_y_bottom+1:U_y_top]/delta_t - sigma_Yee[U_x_right,U_y_bottom+1:U_y_top]/2, ez_U_old[-1,U_y_bottom+1:U_y_top]))
     term5 = np.multiply(delta_x_Yee[U_x_right]/4, jz_U[-1,U_y_bottom+1:U_y_top,n] + jz_U[-1,U_y_bottom+1:U_y_top,n-1])
     """
-
+    """
     term1 = (hy_U_new[-1,1:] + hy_U_old[-1,1:])/2
     term2_plus = delta_x_Yee[U_x_right]*(np.divide(bx_U_new[-1,1:], 2*np.multiply(mu_Yee[U_x_right,U_y_bottom+1:U_y_top], delta_y_Yee[U_y_bottom+1:U_y_top])))
     term2_min = -delta_x_Yee[U_x_right]*(np.divide(bx_U_new[-1,:-1], 2*np.multiply(mu_Yee[U_x_right,U_y_bottom:U_y_top-1], delta_y_Yee[U_y_bottom:U_y_top-1])))
@@ -203,7 +253,7 @@ for n in range(iterations):
     bx_Yee_new[U_x_right, U_y_bottom] = bx_U_new[M_U_separate_cumsumlist[-1]-1,0]
     bx_Yee_new[U_x_right, U_y_top] = bx_U_new[M_U_separate_cumsumlist[-1]-1,-1]
 
-
+    """
     bx_Yee_list[:,:,n] = bx_Yee_new
     ez_Yee_list[:,:,n] = ez_Yee_new
     hy_Yee_list[:,:,n] = hy_Yee_new

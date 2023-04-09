@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import scipy.special as special
 from matplotlib.pyplot import pcolormesh
 from matplotlib.animation import FuncAnimation
+from functions import def_update_matrices, update_implicit
 
 epsilon_0 = 8.85*10**(-12)
 mu_0 = 1.25663706*10**(-6)
@@ -24,14 +25,17 @@ sigma = np.ones((M,N))*0
 
 delta_x = np.ones(M)*10/M
 delta_y = np.ones(N)*10/N
+
+#delta_x = [((i+1)**(1/10))*10/M for i in range(M)]
+
 delta_x_matrix = np.array([np.repeat(delta_x[i], N) for i in range(M)])
 delta_y_matrix = np.array([delta_y for i in range(M)])
 
 courant_number = 1
-delta_t = np.max(delta_y)/(c)*courant_number
+delta_t = np.min(delta_y)/(c)*courant_number
 print(delta_t)
 
-source = 'dirac'
+source = 'gaussian'
 J0 = 1
 tc = 5
 sigma_source = 1
@@ -79,7 +83,7 @@ def update_bx(bx_old, ez_old):
     bx[:,-1] = bx_old[:,-1] - (ez_old[:,0] - ez_old[:,-1]) # add periodic boundary condition
     return bx
 
-def update_implicit(ez_old, hy_old, bx, n, A_inv, B):
+def update_implicit_OLD(ez_old, hy_old, bx, n, A_inv, B):
 
     bx_term = -(delta_t/2)*np.divide(bx, np.multiply(mu, delta_y_matrix))
     C_term_base = np.roll(bx_term, -1, 0) + bx_term - np.roll(np.roll(bx_term, -1, 0), 1, 1) - np.roll(bx_term, 1, 1)
@@ -103,7 +107,7 @@ def def_explicit_update_matrix():
         E[b, b] = delta_x[i]/delta_t
     return E
 
-def def_update_matrices(epsilon, mu, sigma, delta_x, delta_y, delta_t):
+def def_update_matrices_OLD(epsilon, mu, sigma, delta_x, delta_y, delta_t):
     A = np.zeros((2*M, 2*M))
     B = np.zeros((2*M, 2*M))
 
@@ -154,6 +158,16 @@ def def_update_matrices(epsilon, mu, sigma, delta_x, delta_y, delta_t):
             B[M+i,M+i] = -1/(2*delta_x[i])
     return [A, B]
 
+def step_OLD(ez_old, hy_old, bx_old, A_inv, B, n):
+    bx_new = update_bx(bx_old, ez_old)
+    [ez_new, hy_new] = update_implicit(ez_old, hy_old, bx_new, n, A_inv, B, delta_t, delta_y_matrix, M, N, jz, mu)
+    return [ez_new, hy_new, bx_new]
+
+def step(ez_old, hy_old, bx_old, A_inv, B, n):
+    [ez_new, hy_new] = update_implicit(ez_old, hy_old, bx_old, n, A_inv, B, delta_t, delta_y_matrix, M, N, jz, mu)
+    bx_new = update_bx(bx_old, ez_new)
+    return [ez_new, hy_new, bx_new]
+
 
 def run_UCHIE():
     ez = np.zeros((M,N))
@@ -166,7 +180,7 @@ def run_UCHIE():
 
     ez_list_observe = np.zeros((iterations, len(observation_points_ez)))
 
-    [A, B] = def_update_matrices(epsilon, mu, sigma, delta_x, delta_y, delta_t)
+    [A, B] = def_update_matrices(epsilon, mu, sigma, delta_x, delta_y, delta_t, M)
     A_inv = linalg.inv(A)
     for n in range(iterations):
         print(f'iteration {n+1}/{iterations} started')
@@ -179,12 +193,6 @@ def run_UCHIE():
             ez_list_observe[n, i] = ez[point]
 
     return bx_list, ez_list, hy_list, ez_list_observe
-
-def step(ez_old, hy_old, bx_old, A_inv, B, n):
-    bx_new = update_bx(bx_old, ez_old)
-    [ez_new, hy_new] = update_implicit(ez_old, hy_old, bx_new, n, A_inv, B)
-    return [ez_new, hy_new, bx_new]
-
 
 jz = def_jz(source)
 
