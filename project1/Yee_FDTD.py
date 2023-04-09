@@ -64,14 +64,21 @@ class Yee_FDTD:
         j_lower=np.argmin(np.abs(self.mesh.y_vector_ez-y_lower))
         j_upper=np.argmin(np.abs(self.mesh.y_vector_ez-y_upper))
         
-        self.extra_eps = np.ones((diff_i,n_cells_y))
-        self.extra_mu = np.ones((diff_i,n_cells_y))
+        self.extra_eps = np.ones((diff_i,n_cells_y-1))
+        self.extra_mu = np.ones((diff_i,n_cells_y-1))
         
         self.extra_eps[i_lower+1:i_upper+1,j_lower+1:j_upper+1]=epsilon_r 
         self.extra_mu[i_lower+1:i_upper+1,j_lower+1:j_upper+1]=mu_r
         
-        self.epsilon_r = np.c_[self.epsilon_r.T[:i_lower,:],self.extra_eps.T,self.epsilon_r.T[i_lower+1:,:]]
-        self.mu_r = np.c_[self.mu_r[:i_lower,:],self.extra_mu,self.mu_r[i_lower+1:,:]]
+        print(self.extra_eps.shape)
+        print(self.epsilon_r.shape)
+        
+        print(self.epsilon_r[:i_lower,:].shape)
+        print(self.epsilon_r[i_lower+1:,:].shape)
+        
+        
+        self.epsilon_r = np.concatenate((self.epsilon_r[:i_lower,:].T,self.extra_eps.T,self.epsilon_r[i_lower+1:,:].T),axis=1)
+        self.mu_r = np.concatenate((self.mu_r[:i_lower,:].T,self.extra_mu.T,self.mu_r[i_lower+1:,:].T),axis=1)
         
         
     def add_PML(self, N_PML, kappa_max,m=4):

@@ -165,7 +165,7 @@ class mesh:
         i_lower=np.argmin(np.abs(self.x_vector_ez-x_lower))
         i_upper=np.argmin(np.abs(self.x_vector_ez-x_upper))
         
-        new_steps = np.linspace(x_lower,x_upper,N_original*N_replacement+1)[1:-1]
+        new_steps = np.linspace(x_lower,x_upper,N_original*N_replacement+1)
         
         self.primary_x_vector = np.concatenate((self.primary_x_vector[:i_lower],new_steps,self.primary_x_vector[i_upper+1:]))
         

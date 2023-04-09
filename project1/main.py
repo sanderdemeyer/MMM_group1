@@ -15,7 +15,7 @@ import scipy.special as ss
 
 #Initialization of the mesh with arguments size in the x-direction, size in 
 #the y_direction, number of grid cells in x-direction and number of grid cells in y-direction
-mesh1=mesh.mesh(5, 5, 15,15,plot=True)
+mesh1=mesh.mesh(5, 5, 16,16,plot=True)
 
 
 #Initialization of the Yee simulation, specifying the mesh, the duration,
@@ -26,7 +26,7 @@ yee1=Yee_FDTD.Yee_FDTD(mesh1,20,Courant_factor=1,boundary_condition='PBC')
 #Addition of a dielectric medium (rectangle), with arguments relative permittivity, lower x-bound,
 #upper x-bound, lower y-bound and upper y-bound 
 yee1.add_dielectric(3,1,2,3,0,5)
-yee1.add_refinement(3,1,15,3,2,2,3,0,5)
+yee1.add_refinement(3,1,16,3,2,2,3,0,5)
 
 #Addition of a PML layer, also adapts the mesh, with arguments the number of layers,
 #kappa_max and the the value of m
