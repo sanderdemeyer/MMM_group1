@@ -11,7 +11,7 @@ def def_jz(source, M, N, x_point, y_point, iterations, delta_value):
         for n in range(iterations):
             for i in range(M):
                 for j in range(N):
-                    jz[i, j, n] = J0*np.exp(-(n-tc)**2/(2*sigma_source**2))*np.exp(-(i**2 + j**2)/(2*sigma_source**2))
+                    jz[i, j, n] = J0*np.exp(-(n-tc)**2/(2*sigma_source**2))*np.exp(-((i-x_point)**2 + (j-y_point)**2)/(2*sigma_source**2))
     elif source == 'gaussian':
         delta_t = delta_value
         tc = 5
@@ -21,7 +21,7 @@ def def_jz(source, M, N, x_point, y_point, iterations, delta_value):
         for n in range(iterations):
             for i in range(M):
                 for j in range(N):
-                    jz[i, j, n] = J0*np.exp(-(n-tc)**2/(2*sigma_source**2))*np.sin(omega_c*n*delta_t)*np.exp(-(i**2 + j**2)/(2*sigma_source**2))
+                    jz[i, j, n] = J0*np.exp(-(n-tc)**2/(2*sigma_source**2))*np.sin(omega_c*n*delta_t)*np.exp(-((i-x_point)**2 + (j-y_point)**2)/(2*sigma_source**2))
     elif source == 'sine':
         delta_t = delta_value
         tc = 5

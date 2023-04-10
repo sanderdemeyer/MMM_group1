@@ -4,6 +4,16 @@ import scipy.special as special
 import numpy.fft as fft
 
 
+omega = 10**6
+delta_t = 10**(-7)
+tijds = [1] + [0 for n in range(150)]
+
+print(tijds)
+print(fft.fft(tijds))
+
+
+print(a)
+
 d = np.array([[0, 1, 2], [3, 4, 5], [6, 7, 8]])
 
 dflat = d.flatten()/8
@@ -136,3 +146,8 @@ print(fft.fft([1] + [0 for i in range(iterations-1)]))
 a = np.array([[1, 2], [3, 4]])
 print(a)
 print(np.divide(1, a))
+
+
+
+
+

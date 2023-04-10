@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import scipy.special as special
 from matplotlib.pyplot import pcolormesh
 from matplotlib.animation import FuncAnimation
-from functions import def_update_matrices, update_implicit
+from functions import def_update_matrices, update_implicit, def_jz
 
 epsilon_0 = 8.85*10**(-12)
 mu_0 = 1.25663706*10**(-6)
@@ -23,8 +23,8 @@ epsilon = np.ones((M,N))*epsilon_0
 mu = np.ones((M,N))*mu_0
 sigma = np.ones((M,N))*0
 
-delta_x = np.ones(M)*10/M
-delta_y = np.ones(N)*10/N
+delta_x = np.ones(M)*10/M/100
+delta_y = np.ones(N)*10/N/100
 
 #delta_x = [((i+1)**(1/10))*10/M for i in range(M)]
 
@@ -33,14 +33,19 @@ delta_y_matrix = np.array([delta_y for i in range(M)])
 
 courant_number = 1
 delta_t = np.min(delta_y)/(c)*courant_number
+delta_t_base = 10**(-9)/3
 print(delta_t)
 
-source = 'gaussian'
+source = 'gaussian_modulated'
+x_source = 50
+y_source = 50
 J0 = 1
 tc = 5
 sigma_source = 1
 period = 10
 omega_c = (2*np.pi)/(period*delta_t) # to have a period of 10 time steps
+
+jz = def_jz(source, M, N, x_source, y_source, iterations, delta_t)
 
 # period for the wave to go around = 
 # T = delta_t*n = N delta_y / c
@@ -49,15 +54,15 @@ omega_c = (2*np.pi)/(period*delta_t) # to have a period of 10 time steps
 observation_points_ez = [(15, 0), (0, 15), (15, 15)]
 
 #observation_points_ez = [(0, i) for i in range(M)]
-observation_points_ez = [(i, 0) for i in range(M)]
+observation_points_ez = [(x_source + i, y_source) for i in range(M//2)]
 
-def def_jz(source):
+def def_jz_OLD(source):
     jz = np.zeros((M, N, iterations))
     if source == 'gaussian_modulated':
         for n in range(iterations):
             for i in range(M):
                 for j in range(N):
-                    jz[i, j, n] = J0*np.exp(-(n-tc)**2/(2*sigma_source**2))*np.exp(-(i**2 + j**2)/(2*sigma_source**2))
+                    jz[i, j, n] = J0*np.exp(-(n-tc)**2/(2*sigma_source**2))*np.exp(-((i-x_point)**2 + j**2)/(2*sigma_source**2))
     elif source == 'gaussian':
         for n in range(iterations):
             for i in range(M):
@@ -182,6 +187,7 @@ def run_UCHIE():
 
     [A, B] = def_update_matrices(epsilon, mu, sigma, delta_x, delta_y, delta_t, M)
     A_inv = linalg.inv(A)
+
     for n in range(iterations):
         print(f'iteration {n+1}/{iterations} started')
         [ez, hy, bx] = step(ez, hy, bx, A_inv, B, n)
@@ -194,7 +200,6 @@ def run_UCHIE():
 
     return bx_list, ez_list, hy_list, ez_list_observe
 
-jz = def_jz(source)
 
 
 [bx_list, ez_list, hy_list, ez_list_observe] = run_UCHIE()
@@ -203,26 +208,32 @@ jz = def_jz(source)
 def hankel(x):
     return -(J0*omega_c*mu_0/4)*special.hankel2(0, (omega_c*x*delta_x[0]/c))
 
+
 d_list = []
 v_list = []
 for i, point in enumerate(observation_points_ez):
     """
-    plt.plot(range(iterations), ez_list[:,i])
+    plt.plot(range(iterations), ez_list_observe[:,i])
     plt.xlabel('Time [s]')
     plt.ylabel('Ez')
     plt.title(f'Ez at {point}')
     plt.show()
     """
+    """
     fft_transform = fft.fft(ez_list_observe[:,i])
     #d_list.append(point[1])
     d_list.append(point[0])
     v_list.append(fft_transform[iterations//period])
-
+    """
+"""
 plt.plot(d_list[10:-10], [i/2 for i in v_list[10:-10]], label = 'computationally')
 #plt.plot(d_list, [hankel(x+1) for x in d_list], label = 'exact solution')
 plt.legend()
 plt.show()
+"""
 
+plt.plot(ez_list[x_source, y_source*3//2,:])
+plt.show()
 
 animation_speed = 1
 
@@ -232,7 +243,7 @@ ax.set_ylabel('Y')
 ax.set_aspect('equal', adjustable='box')
 
 def animate(i):
-   ax.pcolormesh(bx_list[:,:,int(i*animation_speed)])
+   ax.pcolormesh(ez_list[:,:,int(i*animation_speed)])
    ax.set_title(f'n = {int(i*animation_speed)}')
 
 
