@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.sparse import csr_matrix
 
 def def_jz(source, M, N, x_point, y_point, iterations, delta_value):
     J0 = 1
@@ -14,7 +15,7 @@ def def_jz(source, M, N, x_point, y_point, iterations, delta_value):
                     jz[i, j, n] = J0*np.exp(-(n-tc)**2/(2*sigma_source**2))*np.exp(-((i-x_point)**2 + (j-y_point)**2)/(2*sigma_source**2))
     elif source == 'gaussian':
         delta_t = delta_value
-        tc = 5
+        tc = 0
         sigma_source = 1
         period = 10
         omega_c = (2*np.pi)/(period*delta_t) # to have a period of 10 time steps
@@ -138,6 +139,63 @@ def def_update_matrices(epsilon, mu, sigma, delta_x, delta_y, delta_t, M):
             B[M+i,M+i] = -1/(2*delta_x[i])
     return [A, B]
 
+def def_update_matrices_hybrid_new(epsilon, mu, sigma, delta_x, delta_y, delta_t, M, delta_x_Yee_left, delta_x_Yee_right):
+    A = np.zeros((2*M, 2*M))
+    B = np.zeros((2*M, 2*M))
+
+    for i in range(M):
+
+        if i != M-1 and i != 0:
+            A[i,i+1] = delta_y[0]/(2*delta_x[i])
+            A[i, i] = -delta_y[0]/(2*delta_x[i])
+            A[i,M+i+1] = -mu[i+1,0]/(2*delta_t)
+            A[i,M+i] = -mu[i,0]/(2*delta_t)
+
+            B[i,i+1] = -delta_y[0]/(2*delta_x[i])
+            B[i,i] = delta_y[0]/(2*delta_x[i])
+            B[i,M+i+1] = -mu[i+1,0]/(2*delta_t)
+            B[i,M+i] = -mu[i,0]/(2*delta_t)
+
+            # delta_y should be delta_y*
+            A[M+i,i+1] = (epsilon[i+1,0]/(2*delta_t) + sigma[i+1,0]/4)*delta_y[0]
+            A[M+i,i] = (epsilon[i,0]/(2*delta_t) + sigma[i,0]/4)*delta_y[0]
+            A[M+i,M+i+1] = -1/(2*delta_x[i])
+            A[M+i,M+i] = 1/(2*delta_x[i])
+
+            B[M+i,i+1] = (epsilon[i+1,0]/(2*delta_t) - sigma[i+1,0]/4)*delta_y[0]
+            B[M+i,i] = (epsilon[i,0]/(2*delta_t) - sigma[i,0]/4)*delta_y[0]
+            B[M+i,M+i+1] = 1/(2*delta_x[i])
+            B[M+i,M+i] = -1/(2*delta_x[i])
+
+        elif i == 0:
+            A[i,i] = 1/(2*delta_x_Yee_left)
+            A[i,M+i] = -mu[i,0]/delta_t
+
+            B[i,i] = -1/(2*delta_x_Yee_left)
+            B[i,M+i] = -mu[i,0]/delta_t
+
+            A[M+i,i] = epsilon[i,0]/delta_t + sigma[i,0]/2
+            A[M+i,M+i] = -1/delta_x_Yee_left #sign?
+
+            B[M+i,i] = epsilon[i,0]/delta_t - sigma[i,0]/2
+            B[M+i,M+i] = 1/delta_x_Yee_left # sign?
+        elif i == M-1:
+            A[i,i] = 1/(2*delta_x_Yee_right)
+            A[i,M+i] = mu[i,0]/delta_t
+
+            B[i,i] = -1/(2*delta_x_Yee_right)
+            B[i,M+i] = mu[i,0]/delta_t
+
+            A[M+i,i] = epsilon[i,0]/delta_t + sigma[i,0]/2
+            A[M+i,M+i] = 1/delta_x_Yee_right
+
+            B[M+i,i] = epsilon[i,0]/delta_t - sigma[i,0]/2
+            B[M+i,M+i] = -1/delta_x_Yee_right
+
+        else:
+            print('something went terribly wrong')
+    return [A, B]
+
 def def_update_matrices_hybrid(epsilon, mu, sigma, delta_x, delta_y, delta_t, M, delta_x_Yee_left, delta_x_Yee_right):
     A = np.zeros((2*M, 2*M))
     B = np.zeros((2*M, 2*M))
@@ -208,6 +266,54 @@ def update_implicit(ez_old, hy_old, bx, n, A_inv, B, delta_t, delta_y_matrix, M,
     hy_new = new_values[M:,:]
     return [new_values[:M,:], new_values[M:,:]]
 
+
+def update_implicit_hybrid_zeros(ez_old, hy_old, bx, n, A_inv, B, delta_t, delta_y_matrix, M, N, jz, mu, delta_x_Yee_left, delta_x_Yee_right, Ez_left_new, Ez_left_old, Ez_right_new, Ez_right_old, Hy_left, Hy_right):
+
+    bx_term = -(delta_t/2)*np.divide(bx, np.multiply(mu, delta_y_matrix))
+    C_term_base = np.roll(bx_term, -1, 0) + bx_term - np.roll(np.roll(bx_term, -1, 0), 1, 1) - np.roll(bx_term, 1, 1)
+    C_term = np.concatenate((np.zeros((M, N)), C_term_base))
+    # should be delta_y_star_matrix
+    jz_n = -np.multiply(delta_y_matrix, jz[:,:,n])/4
+    jz_nm1 = -np.multiply(delta_y_matrix, jz[:,:,n-1])/4
+    D_term_base = np.roll(jz_n, -1, 0) + jz_n + np.roll(jz_nm1, -1, 0) + jz_nm1
+    D_term = np.concatenate((np.zeros((M, N)), D_term_base))
+
+
+    new_values = np.dot(A_inv, (np.dot(B, np.concatenate((ez_old, hy_old))) + C_term + D_term))
+
+    values_left_old = np.concatenate((ez_old[0,:], hy_old[0,:]))
+
+
+
+    ez_new = new_values[:M,:]
+    hy_new = new_values[M:,:]
+    return [new_values[:M,:], new_values[M:,:]]
+
+
+
+def update_implicit_hybrid_new(ez_old, hy_old, bx, n, A_inv, B, delta_t, delta_y_matrix, M, N, jz, mu, delta_x_Yee_left, delta_x_Yee_right, Ez_left_new, Ez_left_old, Ez_right_new, Ez_right_old, Hy_left, Hy_right):
+
+    bx_term = -(delta_t/2)*np.divide(bx, np.multiply(mu, delta_y_matrix))
+    C_term_base = np.roll(bx_term, -1, 0) + bx_term - np.roll(np.roll(bx_term, -1, 0), 1, 1) - np.roll(bx_term, 1, 1)
+    C_term = np.concatenate((np.zeros((M, N)), C_term_base))
+    # should be delta_y_star_matrix
+    jz_n = -np.multiply(delta_y_matrix, jz[:,:,n])/4
+    jz_nm1 = -np.multiply(delta_y_matrix, jz[:,:,n-1])/4
+    D_term_base = np.roll(jz_n, -1, 0) + jz_n + np.roll(jz_nm1, -1, 0) + jz_nm1
+    D_term = np.concatenate((np.zeros((M, N)), D_term_base))
+
+    tot_term = C_term + D_term
+
+    tot_term[0,:] = 1/(2*delta_x_Yee_left)*(Ez_left_new + Ez_left_old)
+    tot_term[M-1,:] = 1/(2*delta_x_Yee_right)*(Ez_right_new + Ez_right_old)
+
+    bx_term = np.divide(bx, np.multiply(mu, delta_y_matrix))
+    tot_term[M,:] = -2/(delta_x_Yee_left)*Hy_left - bx_term[0,:] + np.roll(bx_term, 1, 1)[0,:] - jz[0,:,n]
+    tot_term[2*M-1,:] = 2/(delta_x_Yee_right)*Hy_right - bx_term[-1,:] + np.roll(bx_term, 1, 1)[-1,:] - jz[-1,:,n]
+
+    new_values = np.dot(A_inv, (np.dot(B, np.concatenate((ez_old, hy_old))) + tot_term))
+    return [new_values[:M,:], new_values[M:,:]]
+
 def update_implicit_hybrid(ez_old, hy_old, bx, n, A_inv, B, delta_t, delta_y_matrix, M, N, jz, mu, delta_x_Yee_left, delta_x_Yee_right, Hy_Yee_left, Hy_Yee_right, Ez_Yee_left, Ez_Yee_right):
 
     bx_term = -(delta_t/2)*np.divide(bx, np.multiply(mu, delta_y_matrix))
@@ -249,3 +355,54 @@ def update_implicit_hybrid(ez_old, hy_old, bx, n, A_inv, B, delta_t, delta_y_mat
     ez_new = new_values[:M,:]
     hy_new = new_values[M:,:]
     return [new_values[:M,:], new_values[M:,:]]
+
+def def_update_matrices_sparse(epsilon, mu, sigma, delta_x, delta_y, delta_t, M):
+    A = csr_matrix((2*M, 2*M))
+    B = csr_matrix((2*M, 2*M))
+
+    for i in range(M):
+
+        if i != M-1:
+            A[i,i+1] = delta_y[0]/(2*delta_x[i])
+            A[i, i] = -delta_y[0]/(2*delta_x[i])
+            A[i,M+i+1] = -mu[i+1,0]/(2*delta_t)
+            A[i,M+i] = -mu[i,0]/(2*delta_t)
+
+            B[i,i+1] = -delta_y[0]/(2*delta_x[i])
+            B[i,i] = delta_y[0]/(2*delta_x[i])
+            B[i,M+i+1] = -mu[i+1,0]/(2*delta_t)
+            B[i,M+i] = -mu[i,0]/(2*delta_t)
+
+            # delta_y should be delta_y*
+            A[M+i,i+1] = (epsilon[i+1,0]/(2*delta_t) + sigma[i+1,0]/4)*delta_y[0]
+            A[M+i,i] = (epsilon[i,0]/(2*delta_t) + sigma[i,0]/4)*delta_y[0]
+            A[M+i,M+i+1] = -1/(2*delta_x[i])
+            A[M+i,M+i] = 1/(2*delta_x[i])
+
+            B[M+i,i+1] = (epsilon[i+1,0]/(2*delta_t) - sigma[i+1,0]/4)*delta_y[0]
+            B[M+i,i] = (epsilon[i,0]/(2*delta_t) - sigma[i,0]/4)*delta_y[0]
+            B[M+i,M+i+1] = 1/(2*delta_x[i])
+            B[M+i,M+i] = -1/(2*delta_x[i])
+
+        else:
+            A[i,0] = delta_y[0]/(2*delta_x[i])
+            A[i, i] = -delta_y[0]/(2*delta_x[i])
+            A[i,M] = -mu[0,0]/(2*delta_t)
+            A[i,M+i] = -mu[i,0]/(2*delta_t)
+
+            B[i,0] = -delta_y[0]/(2*delta_x[i])
+            B[i,i] = delta_y[0]/(2*delta_x[i])
+            B[i,M] = -mu[0,0]/(2*delta_t)
+            B[i,M+i] = -mu[i,0]/(2*delta_t)
+
+            # delta_y should be delta_y*
+            A[M+i,0] = (epsilon[0,0]/(2*delta_t) + sigma[0,0]/4)*delta_y[0]
+            A[M+i,i] = (epsilon[i,0]/(2*delta_t) + sigma[i,0]/4)*delta_y[0]
+            A[M+i,M] = -1/(2*delta_x[i])
+            A[M+i,M+i] = 1/(2*delta_x[i])
+
+            B[M+i,0] = (epsilon[0,0]/(2*delta_t) - sigma[0,0]/4)*delta_y[0]
+            B[M+i,i] = (epsilon[i,0]/(2*delta_t) - sigma[i,0]/4)*delta_y[0]
+            B[M+i,M] = 1/(2*delta_x[i])
+            B[M+i,M+i] = -1/(2*delta_x[i])
+    return [A, B]

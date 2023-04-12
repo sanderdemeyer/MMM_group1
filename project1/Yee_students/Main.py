@@ -25,7 +25,7 @@ yee1=Yee_FDTD.Yee_FDTD(mesh1,20,Courant_factor=1,boundary_condition='PBC')
 
 #Addition of a dielectric medium (rectangle), with arguments relative permittivity, lower x-bound,
 #upper x-bound, lower y-bound and upper y-bound 
-yee1.add_dielectric(3,1,2,3,0,5)
+#yee1.add_dielectric(3,1,2,3,0,5)
 
 #Addition of a PML layer, also adapts the mesh, with arguments the number of layers,
 #kappa_max and the the value of m

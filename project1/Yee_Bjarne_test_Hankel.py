@@ -6,9 +6,8 @@ import scipy.special as special
 from matplotlib.pyplot import pcolormesh
 from matplotlib.animation import FuncAnimation
 import copy
-from functions import def_jz
 
-def def_jz_OLD(source, M, N, iterations, x_point, y_point):
+def def_jz(source, M, N, iterations):
     jz = np.zeros((M, N, iterations))
     if source == 'gaussian_modulated':
         for n in range(iterations):
@@ -26,7 +25,7 @@ def def_jz_OLD(source, M, N, iterations, x_point, y_point):
                 for j in range(N):
                     jz[i, j, n] = J0*np.sin(omega_c*n*delta_t)*np.exp(-(i**2 + j**2)/(2*sigma_source**2))
     elif source == 'dirac':
-        jz[x_point, y_point, 0] = 1/(delta_x[0]*delta_y[0])
+        jz[M//3, N//4, 0] = 1/(delta_x[0]*delta_y[0])
     return jz
 
 epsilon_0 = 8.85*10**(-12)
@@ -35,11 +34,8 @@ c = 3*10**8
 M = 100
 N = 100
 
-x_source = 50
-y_source = 50
-
 observation_points_ez = [(i, 0) for i in range(M)]
-observation_points_ez = [(x_source + i, y_source) for i in range(M//2)]
+observation_points_ez = [(M//3, N//4)]
 iterations = 150
 
 
@@ -52,9 +48,9 @@ delta_y = np.ones(N)*10/N
 delta_x_matrix = np.array([np.repeat(delta_x[i], N) for i in range(M)])
 delta_y_matrix = np.array([delta_y for i in range(M)])
 
-courant_number = 1
+courant_number = 0.9
 delta_t = courant_number/(c*np.sqrt(1/(np.max(delta_x))**2 + 1/(np.max(delta_y))**2))
-print(delta_t)
+
 
 eps_sigma_plus = epsilon/delta_t + sigma/2
 eps_sigma_min = epsilon/delta_t - sigma/2
@@ -63,54 +59,25 @@ eq2_matrix = np.divide(delta_t, np.multiply(mu, delta_x_matrix))
 
 
 #source should be either 'sine', 'gaussian_modulated', or 'gaussian'
-source = 'gaussian_modulated'
+source = 'dirac'
 J0 = 1
 tc = 5
-sigma_source = 0.2
+sigma_source = 0.01
 period = 10
 omega_c = (2*np.pi)/(period*delta_t) # to have a period of 10 time steps
-omega_c = (2*np.pi)/(period*10**(-9)/3)
-jz = def_jz(source, M, N, x_source, y_source, iterations, delta_t)
-
 
 ez_new = np.zeros((M, N))
 hy_new = np.zeros((M, N))
 bx_new = np.zeros((M, N))
 
+jz = def_jz(source, M, N, iterations)
 
 bx_list = np.zeros((M,N, iterations))
 ez_list = np.zeros((M,N, iterations))
 hy_list = np.zeros((M,N, iterations))
 
 ez_observation_list = np.zeros((iterations, len(observation_points_ez)))
-""" Correct
-for n in range(iterations):
-    print(f'iteration {n+1}/{iterations} started')
-    ez_old = ez_new
-    hy_old = hy_new
-    bx_old = bx_new
 
-    eq_2_term = np.multiply(eq2_matrix, ez_old)
-    hy_new = hy_old + np.roll(eq_2_term, -1, 0) - eq_2_term
-
-    eq_3_term = np.divide(ez_old*delta_t, delta_y_matrix)
-    bx_new = bx_old - np.roll(eq_3_term, -1, 1) + eq_3_term
-    
-    eq_4_hy = np.divide(hy_new, delta_x_matrix)
-    eq_4_bx = np.divide(bx_new, np.multiply(delta_y_matrix, mu))
-    # with source averaging
-    #eq_4_term = np.multiply(eps_sigma_min, ez_old) - (jz[:,:,n]+jz[:,:,n-1])/2 + eq_4_hy - np.roll(eq_4_hy, 1, 0) - eq_4_bx + np.roll(eq_4_bx, 1, 1)
-    # without source averaging
-    eq_4_term = np.multiply(eps_sigma_min, ez_old) - jz[:,:,n] + eq_4_hy - np.roll(eq_4_hy, 1, 0) - eq_4_bx + np.roll(eq_4_bx, 1, 1)
-    ez_new = np.divide(eq_4_term, eps_sigma_plus)
-
-    bx_list[:,:,n] = bx_new
-    ez_list[:,:,n] = ez_new
-    hy_list[:,:,n] = hy_new
-
-    for i, point in enumerate(observation_points_ez):
-        ez_observation_list[n, i] = ez_new[point]
-"""
 for n in range(iterations):
     print(f'iteration {n+1}/{iterations} started')
     """
@@ -130,10 +97,7 @@ for n in range(iterations):
     
     eq_4_hy = np.divide(hy_new, delta_x_matrix)
     eq_4_bx = np.divide(bx_new, np.multiply(delta_y_matrix, mu))
-    # with source averaging
     eq_4_term = np.multiply(eps_sigma_min, ez_old) - (jz[:,:,n]+jz[:,:,n-1])/2 + eq_4_hy - np.roll(eq_4_hy, 1, 0) - eq_4_bx + np.roll(eq_4_bx, 1, 1)
-    # without source averaging
-    #eq_4_term = np.multiply(eps_sigma_min, ez_old) - jz[:,:,n] + eq_4_hy - np.roll(eq_4_hy, 1, 0) - eq_4_bx + np.roll(eq_4_bx, 1, 1)
     ez_new = np.divide(eq_4_term, eps_sigma_plus)
 
     bx_list[:,:,n] = bx_new
@@ -156,41 +120,59 @@ def animate(i):
 
 anim = FuncAnimation(fig, animate)
 plt.show()
-
+obs_ez = ez_list[3,4,:]
+print(obs_ez)
+tijdas = np.linspace(1,len(obs_ez),len(obs_ez))
+plt.figure()
+plt.plot(tijdas,obs_ez)
+plt.show()
 """
 fig, ax = plt.subplots()
 ax.set_xlabel('X')
 ax.set_ylabel('Y')
 ax.set_aspect('equal', adjustable='box')
-
 def animate(i):
    ax.pcolormesh(ez_list[:,:,int(i*animation_speed)])
    ax.set_title(f'n = {int(i*animation_speed)}')
-
-
 anim = FuncAnimation(fig, animate)
 plt.show()
-
 fig, ax = plt.subplots()
 ax.set_xlabel('X')
 ax.set_ylabel('Y')
 ax.set_aspect('equal', adjustable='box')
-
 def animate(i):
    ax.pcolormesh(hy_list[:,:,int(i*animation_speed)])
    ax.set_title(f'n = {int(i*animation_speed)}')
-
-
 anim = FuncAnimation(fig, animate)
 plt.show()
-
-
 print(bx_list[:,:,50])
 """
 
+obs_ez = ez_list[3,4,:]
+arg_hankel = np.sqrt((M//3 - 3)**2 + (N//4 - 4)**2)
 
-fft_trafod = [fft.fft(ez_observation_list[:,i])[1] for i in range(len(observation_points_ez))]
+def hankel(omega_c):
+    return -(J0*omega_c*mu_0/4)*special.hankel2(0, (omega_c /c*arg_hankel)*0.1)
+
+fourier = fft.fft(obs_ez)
+freqas = fft.fftfreq(len(obs_ez),delta_t)
+fourier =fourier[:len(freqas)//2]
+freqas = freqas[:len(freqas)//2]
+print(freqas)
+verif = []
+dummy = 0
+for i in range(int(len(freqas))):
+    verif.append(hankel(freqas[i]))
+    fourier[i] = fourier[i]/ (J0*np.sqrt(2*np.pi)*sigma_source*np.exp(-1/2*sigma_source**2*freqas[i]**2))
+    print(fourier[i])
+    dummy += 1
 
 
-plt.plot(ez_list[70, 50, :])
+
+plt.figure()
+plt.plot(freqas,fourier)
+plt.show()
+
+plt.figure()
+plt.plot(freqas,verif)
 plt.show()

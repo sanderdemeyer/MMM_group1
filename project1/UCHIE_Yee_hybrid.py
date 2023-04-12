@@ -94,7 +94,7 @@ ez_U_new = np.zeros((M_U, N_U))
 hy_U_new = np.zeros((M_U, N_U))
 bx_U_new = np.zeros((M_U, N_U))
 
-source = 'dirac'
+source = 'gaussian_modulated'
 jz_U = def_jz(0, M_U, N_U, source_X_U, source_Y_U, iterations, 1/(delta_x_U[0]*delta_y_U[0]))
 jz_Yee = def_jz(source, M_Yee, N_Yee, source_X_Yee, source_Y_Yee, iterations, 1/(delta_x_Yee[0]*delta_y_Yee[0]))
 
@@ -162,8 +162,7 @@ for n in range(iterations):
     # ez_U[:,0] does not exist, or equivalently, is always zero.
     bx_U_new[:,0] = bx_U_old[:,0] - (ez_U_new[:,1] - np.dot(interpolate_matrix, ez_Yee_new[U_x_left:U_x_right+1,U_y_bottom])) # add periodic boundary condition
 
-    """ 
-    #Should be executed, but does not work yet.
+    """    #Should be executed, but does not work yet.
     # Change the edges of the Yee-region: equate the bx-values around the UCHIE box and the ez-values on the left and right side to the just updated UCHIE values.
     ez_Yee_new[U_x_left,U_y_bottom:U_y_top] = ez_U_new[0,:]
     ez_Yee_new[U_x_right,U_y_bottom:U_y_top] = ez_U_new[-1,:]
@@ -176,7 +175,6 @@ for n in range(iterations):
    # bx_Yee_old[U_x_right, U_y_bottom] = bx_U_new[M_U_separate_cumsumlist[-1]-1,0]
    # bx_Yee_old[U_x_right, U_y_top] = bx_U_new[M_U_separate_cumsumlist[-1]-1,-1]
     """
-
 
 
     """ wrong, I think

@@ -3,6 +3,33 @@ import matplotlib.pyplot as plt
 import scipy.special as special
 import numpy.fft as fft
 
+M_U = 3
+
+A = np.array([[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11], [12, 13, 14, 15]])
+print(A)
+
+A[[1, M_U-1]] = A[[M_U-1, 1]]
+A[:,[1, M_U-1]] = A[:,[M_U-1, 1]]
+
+print(A)
+
+
+
+
+
+print(a)
+
+lijst = fft.fftfreq(60, 10**(-9))
+print(len(lijst))
+print(lijst)
+
+
+print(a)
+
+plt.plot([special.hankel2(0,x) for x in range(100)])
+plt.show()
+
+print(a)
 
 omega = 10**6
 delta_t = 10**(-7)

@@ -1,5 +1,5 @@
 import numpy as np
-from functions import def_update_matrices_new
+from functions import def_update_matrices_new, def_update_matrices_sparse
 import numpy.linalg as linalg
 from time import perf_counter
 from scipy.linalg import lu
@@ -11,8 +11,8 @@ from scipy.sparse import csc_matrix
 epsilon_0 = 8.85*10**(-12)
 mu_0 = 1.25663706*10**(-6)
 c = 3*10**8
-M = 1000
-N = 1000
+M = 5000
+N = 5000
 
 epsilon = np.ones((M,N))*epsilon_0
 mu = np.ones((M,N))*mu_0
@@ -31,7 +31,7 @@ delta_t = np.min(delta_y)/(c)*courant_number
 
 
 
-A,B = def_update_matrices_new(epsilon,mu,sigma,delta_x,delta_y,delta_t,M)
+A,B = def_update_matrices_sparse(epsilon,mu,sigma,delta_x,delta_y,delta_t,M)
 t1 = perf_counter()
 M11 = A[:M,:M]
 M12 = A[:M,M:]
