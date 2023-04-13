@@ -46,7 +46,7 @@ courant_number = 1
 delta_t = np.min(delta_y)/(c)*courant_number # in units s
 
 ### Definition of the source 
-# Source should be either dirac, gaussian, or gaussian_modulated
+# The source type should be either dirac, gaussian, or gaussian_modulated
 source = 'dirac' # type of the source
 x_source = 50 # x-coordinate of the source. Make sure this is within bounds.
 y_source = 50 # y-coordinate of the source. Make sure this is within bounds.
@@ -56,7 +56,7 @@ sigma_source = 1 # spread of the source in the case of gaussian or gaussian_modu
 period = 10 # period of the source in number of time steps in the case of gaussian or gaussian_modulated source
 omega_c = (2*np.pi)/(period*delta_t) # angular frequency of the source in the case of gaussian or gaussian_modulated source
 
-jz = def_jz(source, M, N, x_source, y_source, iterations, delta_t)
+jz = def_jz(J0, source, M, N, x_source, y_source, iterations, delta_t, tc, sigma_source, period)
 
 spectral_content = fft.fft(jz[x_source,y_source,:])[0]
 jz = jz/spectral_content

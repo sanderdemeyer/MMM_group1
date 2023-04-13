@@ -8,49 +8,51 @@ from matplotlib.animation import FuncAnimation
 import copy
 from functions import def_jz, def_update_matrices, def_update_matrices_hybrid, update_implicit, update_implicit_hybrid, def_update_matrices_hybrid_new, update_implicit_hybrid_new, update_implicit_hybrid_zeros
 
-epsilon_0 = 8.85*10**(-12)
-mu_0 = 1.25663706*10**(-6)
-c = 3*10**8
+Lx = 1 # Length in the x-direction in units m
+Ly = 1 # Length in the x-direction in units m
+
+M_Yee = 100 # Number of cells in the x-direction
+N_Yee = 100 # Number of cells in the y-direction
+partition = 'uniform' # delta_x_Yee and delta_y_Yee are then constants. If partition != uniform, these should be specified as arrays.
+
+M_U_separate = [5 for i in range(M_Yee)] # For each Yee-cell, this denotes the number of UCHIE cells it is subdivided in.
+M_U = sum(M_U_separate) # The total number of UCHIE cells in the x-direction
+N_U = N_Yee # The total number of UCHIE cells in the y-direction. This 
+
+iterations = 60 # Number of iterations. The total time length that is simulated is then equal to iterations * delta_t
 
 
-M_Yee = 500
-N_Yee = 500
-iterations = 250
+### Definitions of physical constants
+epsilon_0 = 8.85*10**(-12)  # in units F/m
+mu_0 = 1.25663706*10**(-6) # in units N/A^2
+c = 3*10**8 # in units m/s
 
-
-M_U_separate = [5 for i in range(M_Yee)]
-M_U = sum(M_U_separate)
-N_U = N_Yee
-
-# Define the location of the source
-
-source_X_U = M_U//3
-source_Y_U = N_U//3
-source_X_Yee = 5
-source_Y_Yee = 20
-
-assert len(M_U_separate) == M_Yee, 'Length of M_U should be the same number as the number of Yee cells incompassed in the UCHIE region'
-
-
+### Definition of the material properties. These properties should not depend on the y-coordinate.
 epsilon_Yee = np.ones((M_Yee,N_Yee))*epsilon_0
 mM_Yee = np.ones((M_Yee,N_Yee))*mu_0
-sigma_Yee = np.ones((M_Yee,N_Yee))*0
+sigma_Yee = np.ones((M_Yee,N_Yee))*0 # in units kg m^3 s^-3 A^-2 = V m^2 A^-1
 
 epsilon_U = np.ones((M_U,N_U))*epsilon_0
 mu_U = np.ones((M_U,N_U))*mu_0
-sigma_U = np.ones((M_U,N_U))*0
+sigma_U = np.ones((M_U,N_U))*0 # in units kg m^3 s^-3 A^-2 = V m^2 A^-1
 
-delta_x_Yee = np.ones(M_Yee)*10/M_Yee
-delta_y_Yee = np.ones(N_Yee)*10/N_Yee
+if partition == 'uniform':
+    delta_x_Yee = np.ones(M_Yee)*Lx/M_Yee
+    delta_y_Yee = np.ones(N_Yee)*Ly/N_Yee
+else:
+    delta_x_Yee = 0 # specify explicitly
+    delta_y_Yee = 0 # specify explicitly
+
+### These matrices contain the delta_x and delta_y values at a given vertex. 
 delta_x_matrix_Yee = np.array([np.repeat(delta_x_Yee[i], N_Yee) for i in range(M_Yee)])
 delta_y_matrix_Yee = np.array([delta_y_Yee for i in range(M_Yee)])
 
-#delta_x_U_fractions = np.array([[delta_x_Yee[U_x_left + i]/M_U_separate[i] for j in range(M_U_separate[i])] for i in range(M_Yee)])
+# Corresponding delta_x and delta_y matrices for UCHIE part. This is completely determined by the previous settings.
 delta_x_U_fractions = np.array([[1/M_U_separate[i] for j in range(M_U_separate[i])] for i in range(M_Yee)])
+"""
 for i in range(N_Yee):
-    pass
- #   assert abs(sum(delta_x_U_fractions[i,:])-1) < 10**(-7), 'sum of all individual fractions should be 1 for each Yee-cell'
-
+    assert abs(sum(delta_x_U_fractions[i,:])-1) < 10**(-7), 'sum of all individual fractions should be 1 for each Yee-cell'
+"""
 delta_x_U_fractions_cumsumlist = np.array([np.cumsum(el) for el in delta_x_U_fractions])
 M_U_separate_cumsumlist = np.cumsum(M_U_separate)
 M_U_separate_cumsumlist = np.insert(M_U_separate_cumsumlist, 0, 0)
@@ -59,19 +61,44 @@ interpolate_matrix = np.zeros((M_U, M_Yee+1))
 for i in range(M_Yee):
     interpolate_matrix[M_U_separate_cumsumlist[i]:M_U_separate_cumsumlist[i+1],i:i+2] = np.transpose([1-delta_x_U_fractions_cumsumlist[i], delta_x_U_fractions_cumsumlist[i]])
 
-
-#delta_x_U = np.array([delta_x_Yee[i]/M_U_separate[i] for i in range(M_Yee)]).flatten()
 delta_x_U = np.array([delta_x_U_fractions[i,:]*delta_x_Yee[i] for i in range(M_Yee)]).flatten()
 delta_y_U = delta_y_Yee
 
 delta_x_matrix_U = np.array([np.repeat(delta_x_U[i], N_U) for i in range(M_U)])
 delta_y_matrix_U = np.array([delta_y_U for i in range(M_U)])
 
-
-courant_number = 0.9
-
+### Definition of the courant number and the corresponding delta_t.
+# This is based on the minimal time step that needs to be taken to satisfy the courant limit of both the UCHIE and Yee part.
+# The smallest time step of both is chosen. This delta_t is used in both the UCHIE and Yee part.
+courant_number = 1
 delta_t = (courant_number/c)*min(np.max(delta_y_U), 1/(np.sqrt(1/(np.max(delta_x_Yee))**2 + 1/(np.max(delta_y_Yee))**2)))
 
+### Definition of the sources. It is recommended to only set 1 of the 2 sources to non-zero.
+# The source type should be either dirac, gaussian, or gaussian_modulated
+
+# Yee source
+source_Yee = 'gaussian_modulated' # type of the source
+source_X_Yee = 50 # x-coordinate of the source. Make sure this is within bounds.
+source_Y_Yee = 90 # y-coordinate of the source. Make sure this is within bounds.
+J0_Yee = 1 # amplitude of the source in units V^2 m A^-1
+tc_Yee = 5 # tc*delta_t is the time the source peaks
+sigma_source_Yee = 1 # spread of the source in the case of gaussian or gaussian_modulated source
+period_Yee = 10 # period of the source in number of time steps in the case of gaussian or gaussian_modulated source
+omega_c_Yee = (2*np.pi)/(period_Yee*delta_t) # angular frequency of the source in the case of gaussian or gaussian_modulated source
+
+# UCHIE source
+source_U = 'dirac' # type of the source
+source_X_U = 50 # x-coordinate of the source. Make sure this is within bounds.
+source_Y_U = 50 # y-coordinate of the source. Make sure this is within bounds.
+J0_U = 0 # amplitude of the source in units V^2 m A^-1
+tc_U = 5 # tc*delta_t is the time the source peaks
+sigma_source_U = 1 # spread of the source in the case of gaussian or gaussian_modulated source
+period_U = 10 # period of the source in number of time steps in the case of gaussian or gaussian_modulated source
+omega_c_U = (2*np.pi)/(period_U*delta_t) # angular frequency of the source in the case of gaussian or gaussian_modulated source
+
+assert len(M_U_separate) == M_Yee, 'Length of M_U should be the same number as the number of Yee cells incompassed in the UCHIE region'
+
+### Definition of some matrices that are useful later on.
 eps_sigma_plus_U = epsilon_U/delta_t + sigma_U/2
 eps_sigma_min_U = epsilon_U/delta_t - sigma_U/2
 
@@ -80,7 +107,7 @@ eps_sigma_min_Yee = epsilon_Yee/delta_t - sigma_Yee/2
 
 eq2_matrix = np.divide(delta_t, np.multiply(mM_Yee, delta_x_matrix_Yee))
 
-
+### Initialization of all the fields.
 ez_Yee_new = np.zeros((M_Yee, N_Yee))
 hy_Yee_new = np.zeros((M_Yee, N_Yee))
 bx_Yee_new = np.zeros((M_Yee, N_Yee))
@@ -89,19 +116,27 @@ ez_U_new = np.zeros((M_U, N_U))
 hy_U_new = np.zeros((M_U, N_U))
 bx_U_new = np.zeros((M_U, N_U))
 
-source = 'gaussian_modulated'
-jz_U = def_jz(0, M_U, N_U, source_X_U, source_Y_U, iterations, 1/(delta_x_U[0]*delta_y_U[0]))
-jz_Yee = def_jz(source, M_Yee, N_Yee, source_X_Yee, source_Y_Yee, iterations, 1/(delta_x_Yee[0]*delta_y_Yee[0]))
+### Value of the sources based on the definitions above.
+jz_U = def_jz(J0_U, source_U, M_U, N_U, source_X_U, source_Y_U, iterations, 1/(delta_x_U[0]*delta_y_U[0]), tc_U, sigma_source_U, period_U)
+jz_Yee = def_jz(J0_Yee, source_Yee, M_Yee, N_Yee, source_X_Yee, source_Y_Yee, iterations, 1/(delta_x_Yee[0]*delta_y_Yee[0]), tc_Yee, sigma_source_Yee, period_Yee)
 
-print(f'jz_U = {np.sum(jz_U)}')
-print(f'jz_Yee = {np.sum(jz_Yee)}')
-
+### Definition of the UCHIE implicit update matrices.
 [A, B] = def_update_matrices(epsilon_U, mu_U, sigma_U, delta_x_U, delta_y_U, delta_t, M_U)
-A_inv = linalg.inv(A)
+# Determining the type of inversion that is used.
+# Options are numpy_nonsparse, numpy_sparse, schur
+inversion_method = 'numpy_nonsparse'
 
-print(linalg.norm(A_inv))
+# Taking the inverse
+if inversion_method == 'numpy_nonsparse':
+    A_inv = linalg.inv(A)
+elif inversion_method == 'numpy_sparse':
+    print('TBA')
+    pass
+elif inversion_method == 'schur':
+    print('TBA')
+    pass
 
-
+# initialization of the list of fields
 bx_Yee_list = np.zeros((M_Yee, N_Yee, iterations))
 ez_Yee_list = np.zeros((M_Yee, N_Yee, iterations))
 hy_Yee_list = np.zeros((M_Yee, N_Yee, iterations))
@@ -110,6 +145,7 @@ bx_U_list = np.zeros((M_U, N_U, iterations))
 ez_U_list = np.zeros((M_U, N_U, iterations))
 hy_U_list = np.zeros((M_U, N_U, iterations))
 
+### Starting the run
 
 for n in range(iterations):
     print(f'iteration {n+1}/{iterations} started')

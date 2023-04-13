@@ -94,7 +94,7 @@ ez_U_new = np.zeros((M_U, N_U))
 hy_U_new = np.zeros((M_U, N_U))
 bx_U_new = np.zeros((M_U, N_U))
 
-source = 'dirac'
+source = 'gaussian_modulated'
 jz_U = def_jz(0, M_U, N_U, source_X_U, source_Y_U, iterations, 1/(delta_x_U[0]*delta_y_U[0]))
 jz_Yee = def_jz(source, M_Yee, N_Yee, source_X_Yee, source_Y_Yee, iterations, 1/(delta_x_Yee[0]*delta_y_Yee[0]))
 

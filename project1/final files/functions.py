@@ -1,23 +1,17 @@
 import numpy as np
 from scipy.sparse import csr_matrix
 
-def def_jz(source, M, N, x_point, y_point, iterations, delta_value):
-    J0 = 1
+def def_jz(J0, source, M, N, x_point, y_point, iterations, delta_value, tc, sigma_source, period):
     jz = np.zeros((M, N, iterations))
-    if source == 0:
+    if J0 == 0:
         return jz
     elif source == 'gaussian_modulated':
-        tc = 5
-        sigma_source = 1
         for n in range(iterations):
             for i in range(M):
                 for j in range(N):
                     jz[i, j, n] = J0*np.exp(-(n-tc)**2/(2*sigma_source**2))*np.exp(-((i-x_point)**2 + (j-y_point)**2)/(2*sigma_source**2))
     elif source == 'gaussian':
         delta_t = delta_value
-        tc = 0
-        sigma_source = 1
-        period = 10
         omega_c = (2*np.pi)/(period*delta_t) # to have a period of 10 time steps
         for n in range(iterations):
             for i in range(M):
@@ -25,9 +19,6 @@ def def_jz(source, M, N, x_point, y_point, iterations, delta_value):
                     jz[i, j, n] = J0*np.exp(-(n-tc)**2/(2*sigma_source**2))*np.sin(omega_c*n*delta_t)*np.exp(-((i-x_point)**2 + (j-y_point)**2)/(2*sigma_source**2))
     elif source == 'sine':
         delta_t = delta_value
-        tc = 5
-        sigma_source = 1
-        period = 10
         omega_c = (2*np.pi)/(period*delta_t) # to have a period of 10 time steps
         for n in range(iterations):
             for i in range(M):
