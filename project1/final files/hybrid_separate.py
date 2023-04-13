@@ -7,15 +7,17 @@ from matplotlib.pyplot import pcolormesh
 from matplotlib.animation import FuncAnimation
 import copy
 from functions import def_jz, def_update_matrices, def_update_matrices_hybrid, update_implicit, update_implicit_hybrid, def_update_matrices_hybrid_new, update_implicit_hybrid_new, update_implicit_hybrid_zeros
+import scipy.sparse.linalg as ssalg
+from scipy.sparse import csc_matrix
 
 Lx = 1 # Length in the x-direction in units m
 Ly = 1 # Length in the x-direction in units m
 
-M_Yee = 100 # Number of cells in the x-direction
-N_Yee = 100 # Number of cells in the y-direction
+M_Yee = 20 # Number of cells in the x-direction
+N_Yee = 20 # Number of cells in the y-direction
 partition = 'uniform' # delta_x_Yee and delta_y_Yee are then constants. If partition != uniform, these should be specified as arrays.
 
-M_U_separate = [5 for i in range(M_Yee)] # For each Yee-cell, this denotes the number of UCHIE cells it is subdivided in.
+M_U_separate = [1 for i in range(M_Yee)] # For each Yee-cell, this denotes the number of UCHIE cells it is subdivided in.
 M_U = sum(M_U_separate) # The total number of UCHIE cells in the x-direction
 N_U = N_Yee # The total number of UCHIE cells in the y-direction. This 
 
@@ -78,8 +80,8 @@ delta_t = (courant_number/c)*min(np.max(delta_y_U), 1/(np.sqrt(1/(np.max(delta_x
 
 # Yee source
 source_Yee = 'gaussian_modulated' # type of the source
-source_X_Yee = 50 # x-coordinate of the source. Make sure this is within bounds.
-source_Y_Yee = 90 # y-coordinate of the source. Make sure this is within bounds.
+source_X_Yee = 5 # x-coordinate of the source. Make sure this is within bounds.
+source_Y_Yee = 5 # y-coordinate of the source. Make sure this is within bounds.
 J0_Yee = 0 # amplitude of the source in units V^2 m A^-1
 tc_Yee = 5 # tc*delta_t is the time the source peaks
 sigma_source_Yee = 1 # spread of the source in the case of gaussian or gaussian_modulated source
@@ -88,8 +90,8 @@ omega_c_Yee = (2*np.pi)/(period_Yee*delta_t) # angular frequency of the source i
 
 # UCHIE source
 source_U = 'dirac' # type of the source
-source_X_U = 50 # x-coordinate of the source. Make sure this is within bounds.
-source_Y_U = 10 # y-coordinate of the source. Make sure this is within bounds.
+source_X_U = 5 # x-coordinate of the source. Make sure this is within bounds.
+source_Y_U = 5 # y-coordinate of the source. Make sure this is within bounds.
 J0_U = 1 # amplitude of the source in units V^2 m A^-1
 tc_U = 5 # tc*delta_t is the time the source peaks
 sigma_source_U = 1 # spread of the source in the case of gaussian or gaussian_modulated source
@@ -122,6 +124,13 @@ jz_Yee = def_jz(J0_Yee, source_Yee, M_Yee, N_Yee, source_X_Yee, source_Y_Yee, it
 
 ### Definition of the UCHIE implicit update matrices.
 [A, B] = def_update_matrices(epsilon_U, mu_U, sigma_U, delta_x_U, delta_y_U, delta_t, M_U)
+
+M11 = A[:M_U+1,:M_U+1]
+M12 = A[:M_U+1,M_U+1:]
+M21 = A[M_U+1:,:M_U+1]
+M22 = A[M_U+1:,M_U+1:]
+M22_inv = linalg.inv(M22)
+
 # Determining the type of inversion that is used.
 # Options are numpy_nonsparse, numpy_sparse, schur_sparse, schur_nonsparse
 inversion_method = 'numpy_nonsparse'

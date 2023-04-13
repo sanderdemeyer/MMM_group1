@@ -8,14 +8,14 @@ from matplotlib.animation import FuncAnimation
 from functions import def_update_matrices, update_implicit, def_jz
 import scipy.optimize as opt
 
-Lx = 5 # Length in the x-direction in units m
-Ly = 5 # Length in the x-direction in units m
+Lx = 200 # Length in the x-direction in units m
+Ly = 200 # Length in the x-direction in units m
 
-M = 150 # Number of cells in the x-direction
-N = 150 # Number of cells in the y-direction
+M = 400 # Number of cells in the x-direction
+N = 400 # Number of cells in the y-direction
 partition = 'uniform' # delta_x and delta_y are then constants. If partition != uniform, these should be specified as arrays.
 
-iterations = 60 # Number of iterations. The total time length that is simulated is then equal to iterations * delta_t
+iterations = 250 # Number of iterations. The total time length that is simulated is then equal to iterations * delta_t
 
 
 ### Definitions of physical constants
@@ -46,23 +46,25 @@ courant_number = 1
 delta_t = np.min(delta_y)/(c)*courant_number # in units s
 
 ### Definition of the source 
-# The source type should be either dirac, gaussian, or gaussian_modulated
-source = 'gaussian' # type of the source
-x_source = 50 # x-coordinate of the source. Make sure this is within bounds.
-y_source = 50 # y-coordinate of the source. Make sure this is within bounds.
+# The source type should be either dirac, gaussian, gaussian_modulated, or gaussian_modulated_dirac
+source = 'gaussian_modulated_dirac' # type of the source
+x_source = M//2 # x-coordinate of the source. Make sure this is within bounds.
+y_source = N//2 # y-coordinate of the source. Make sure this is within bounds.
 J0 = 1 # amplitude of the source in units V^2 m A^-1
 tc = 5 # tc*delta_t is the time the source peaks
 sigma_source = 1 # spread of the source in the case of gaussian or gaussian_modulated source
 period = 10 # period of the source in number of time steps in the case of gaussian or gaussian_modulated source
 omega_c = (2*np.pi)/(period*delta_t) # angular frequency of the source in the case of gaussian or gaussian_modulated source
 
-jz = def_jz(J0, source, M, N, x_source, y_source, iterations, delta_t, tc, sigma_source, period)
+jz = def_jz(J0, source, M, N, x_source, y_source, iterations, delta_t, tc, sigma_source, period, 1/(delta_x[x_source]*delta_y[y_source]))
 
 spectral_content = fft.fft(jz[x_source,y_source,:])[0]
 jz = jz/spectral_content
 
 observation_points_ez = [(x_source + i, y_source) for i in range(M//2)] # observation points for the electric field
-observation_points_ez = [(50, 60)]
+
+observation_point = ((M//2, int(M*3/5)))
+observation_points_ez = [observation_point]
 
 def update_bx(bx_old, ez_old):
     bx = np.zeros((M, N))
@@ -118,13 +120,16 @@ def run_UCHIE():
 [bx_list, ez_list, hy_list, ez_list_observe] = run_UCHIE()
 
 
-def hankel(x, omega, J0=1):
+def hankel(x, f, J0=1):
+    omega = 2*np.pi*f
     return -(J0*omega*mu_0/4)*special.hankel2(0, (omega*x/c))
 
 frequency_point = 20
 
 fft_transform_r_values = [i*delta_x[0] for i in range(M//2)]
 fft_list = []
+
+
 
 #plt.plot(range(iterations), ez_list_observe[:,40])
 #plt.show()
@@ -136,10 +141,39 @@ for i, point in enumerate(observation_points_ez):
     plt.title(f'Ez at {point}')
     plt.show()
 
-    fft_transform = fft.fft(ez_list_observe[:,i])
-    #plt.plot(fft_transform)
-    #plt.show()
-    fft_list.append(fft_transform[frequency_point])
+    fft_transform = fft.fft(ez_list_observe[:,i]*delta_t)
+   # plt.plot(fft_transform)
+   # plt.show()
+    #fft_list.append(fft_transform[frequency_point])
+
+frequencies = fft.fftfreq(iterations, delta_t)
+
+fft_transform_source = fft.fft(jz[x_source, y_source,:])
+
+
+
+
+print('ok')
+
+plt.plot(frequencies[:iterations//2], fft_transform[:iterations//2])
+plt.title('ez')
+plt.show()
+
+plt.plot(frequencies[:iterations//2], fft_transform_source[:iterations//2])
+plt.title('source')
+plt.show()
+
+dist = np.sqrt((observation_point[0]-x_source)**2 + (observation_point[1]-y_source)**2)
+print(abs(np.divide(fft_transform[1:iterations//2], fft_transform_source[1:iterations//2])))
+print([abs(hankel(dist, omega)) for omega in frequencies[:iterations//2]])
+print(np.divide(abs(np.divide(fft_transform[1:iterations//2], fft_transform_source[1:iterations//2])),[abs(hankel(dist, omega)) for omega in frequencies[1:iterations//2]]))
+
+plt.plot(2*np.pi*frequencies[1:iterations//2], abs(np.divide(fft_transform[1:iterations//2], fft_transform_source[1:iterations//2])), label = 'computational')
+
+plt.plot(2*np.pi*frequencies[:iterations//2], delta_t*delta_x[x_source]*delta_y[x_source]*np.array([abs(hankel(dist, omega)) for omega in frequencies[:iterations//2]]), label = 'analytical')
+plt.legend()
+plt.show()
+
 
 omega = 1/delta_t*frequency_point/delta_x[0]*1
 print(omega)
@@ -165,10 +199,6 @@ plt.plot(d_list[10:-10], [i/2 for i in v_list[10:-10]], label = 'computationally
 plt.legend()
 plt.show()
 """
-plt.show()
-
-plt.plot(ez_list[x_source, y_source*3//2,:])
-plt.show()
 
 animation_speed = 1
 

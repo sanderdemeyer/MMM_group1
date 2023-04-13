@@ -1,10 +1,14 @@
 import numpy as np
 from scipy.sparse import csr_matrix
 
-def def_jz(J0, source, M, N, x_point, y_point, iterations, delta_value, tc, sigma_source, period):
+def def_jz(J0, source, M, N, x_point, y_point, iterations, delta_t, tc, sigma_source, period, delta_value):
     jz = np.zeros((M, N, iterations))
     if J0 == 0:
         return jz
+    elif source == 'gaussian_modulated_dirac':
+        omega_c = (2*np.pi)/(period*delta_t) # to have a period of 10 time steps
+        for n in range(iterations):
+            jz[x_point, y_point, n] = J0*np.exp(-(n-tc)**2/(2*sigma_source**2))*np.sin(omega_c*n*delta_t)*delta_value
     elif source == 'gaussian_modulated':
         for n in range(iterations):
             for i in range(M):

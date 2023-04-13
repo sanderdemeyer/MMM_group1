@@ -3,27 +3,26 @@ import numpy.linalg as linalg
 import numpy.fft as fft
 import matplotlib.pyplot as plt
 import scipy.special as special
+from time import perf_counter
 from matplotlib.pyplot import pcolormesh
 from matplotlib.animation import FuncAnimation
 import copy
 from functions import def_jz, def_update_matrices, def_update_matrices_hybrid, update_implicit, update_implicit_hybrid, def_update_matrices_hybrid_new, update_implicit_hybrid_new, update_implicit_hybrid_zeros
-
-
 from scipy.sparse import csc_matrix
 import scipy.sparse.linalg as ssalg
 
 Lx = 1 # Length in the x-direction in units m
 Ly = 1 # Length in the x-direction in units m
 
-M_Yee = 100 # Number of cells in the x-direction
-N_Yee = 100 # Number of cells in the y-direction
+M_Yee = 400 # Number of cells in the x-direction
+N_Yee = 400 # Number of cells in the y-direction
 partition = 'uniform' # delta_x_Yee and delta_y_Yee are then constants. If partition != uniform, these should be specified as arrays.
 
 M_U_separate = [5 for i in range(M_Yee)] # For each Yee-cell, this denotes the number of UCHIE cells it is subdivided in.
 M_U = sum(M_U_separate) # The total number of UCHIE cells in the x-direction
 N_U = N_Yee # The total number of UCHIE cells in the y-direction. This 
 
-iterations = 60 # Number of iterations. The total time length that is simulated is then equal to iterations * delta_t
+iterations = 100 # Number of iterations. The total time length that is simulated is then equal to iterations * delta_t
 
 
 ### Definitions of physical constants
@@ -130,6 +129,7 @@ jz_Yee = def_jz(J0_Yee, source_Yee, M_Yee, N_Yee, source_X_Yee, source_Y_Yee, it
 # Options are numpy_nonsparse, numpy_sparse, schur
 inversion_method = 'numpy_schur'
 
+t1 = perf_counter()
 # Taking the inverse
 if inversion_method == 'numpy_nonsparse':
     A_inv = linalg.inv(A)
@@ -172,6 +172,10 @@ elif inversion_method == 'numpy_sparse_schur':
     M_inv[M_U+1:,:M_U+1] = Deel3.toarray()
     M_inv[M_U+1:,M_U+1:] = Deel4.toarray()
     A_inv = M_inv
+else:
+    print('Invalid inversion method')
+t2 = perf_counter()
+print(f'Inversion took {t2-t1} seconds.')
 
 # initialization of the list of fields
 bx_Yee_list = np.zeros((M_Yee, N_Yee, iterations))
@@ -229,13 +233,6 @@ for n in range(iterations):
     ez_bottom.append(ez_Yee_new[0,-1])
     ez_bottom = np.array(ez_bottom)
 
-    if n < 15:
-        print('top')
-        print(np.dot(interpolate_matrix, ez_top))
-        print(ez_U_new[:,-1])
-        print('bottom')
-        print(np.dot(interpolate_matrix, ez_bottom))
-        print(ez_U_new[:,1])
     bx_U_new[:,-1] = bx_U_old[:,-1] - (np.dot(interpolate_matrix, ez_top)*delta_t - ez_U_new[:,-1]) # add periodic boundary condition
     # ez_U[:,0] does not exist, or equivalently, is always zero.
     # bottom

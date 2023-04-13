@@ -54,3 +54,7 @@ output = list(output[0])
 print(np.shape(output))
 pt.plot(range(len(output)), output)
 pt.show()
+
+
+
+
