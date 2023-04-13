@@ -123,7 +123,7 @@ jz_Yee = def_jz(J0_Yee, source_Yee, M_Yee, N_Yee, source_X_Yee, source_Y_Yee, it
 ### Definition of the UCHIE implicit update matrices.
 [A, B] = def_update_matrices(epsilon_U, mu_U, sigma_U, delta_x_U, delta_y_U, delta_t, M_U)
 # Determining the type of inversion that is used.
-# Options are numpy_nonsparse, numpy_sparse, schur
+# Options are numpy_nonsparse, numpy_sparse, schur_sparse, schur_nonsparse
 inversion_method = 'numpy_nonsparse'
 
 # Taking the inverse
@@ -132,7 +132,10 @@ if inversion_method == 'numpy_nonsparse':
 elif inversion_method == 'numpy_sparse':
     print('TBA')
     pass
-elif inversion_method == 'schur':
+elif inversion_method == 'schur_sparse':
+    print('TBA')
+    pass
+elif inversion_method == 'schur_nonsparse':
     print('TBA')
     pass
 
