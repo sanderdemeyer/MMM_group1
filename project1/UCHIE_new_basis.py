@@ -9,6 +9,9 @@ from functions import def_update_matrices, update_implicit, def_jz
 import scipy.optimize as opt
 #from Yee_students/Main.py import output_function
 
+
+# THIS IS THE MAIN UCHIE FILE
+
 epsilon_0 = 8.85*10**(-12)
 mu_0 = 1.25663706*10**(-6)
 c = 3*10**8

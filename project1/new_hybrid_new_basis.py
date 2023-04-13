@@ -94,7 +94,7 @@ ez_U_new = np.zeros((M_U, N_U))
 hy_U_new = np.zeros((M_U, N_U))
 bx_U_new = np.zeros((M_U, N_U))
 
-source = 'dirac'
+source = 'gaussian_modulated'
 jz_U = def_jz(0, M_U, N_U, source_X_U, source_Y_U, iterations, 1/(delta_x_U[0]*delta_y_U[0]))
 jz_Yee = def_jz(source, M_Yee, N_Yee, source_X_Yee, source_Y_Yee, iterations, 1/(delta_x_Yee[0]*delta_y_Yee[0]))
 
@@ -297,12 +297,12 @@ for n in range(iterations):
     hy_Yee_old[U_x_left+1:U_x_right-1,U_y_bottom+1:U_y_top-1] = np.zeros((U_Yee-2, N_U-2))
     """
 
-    Ez_left_new = ez_Yee_new[U_x_left-1,U_y_bottom:U_y_top]*delta_t
-    Ez_left_old = ez_Yee_old[U_x_left-1,U_y_bottom:U_y_top]*delta_t
-    Ez_right_new = ez_Yee_new[U_x_right+1,U_y_bottom:U_y_top]*delta_t
-    Ez_right_old = ez_Yee_old[U_x_right+1,U_y_bottom:U_y_top]*delta_t
-    Hy_left = hy_Yee_old[U_x_left-1,U_y_bottom:U_y_top]*delta_t*delta_y_matrix_Yee[U_x_left-1,0]
-    Hy_right = hy_Yee_old[U_x_right,U_y_bottom:U_y_top]*delta_t*delta_y_matrix_Yee[U_x_right,0]
+    Ez_left_new = ez_Yee_new[U_x_left-1,U_y_bottom:U_y_top]
+    Ez_left_old = ez_Yee_old[U_x_left-1,U_y_bottom:U_y_top]
+    Ez_right_new = ez_Yee_new[U_x_right+1,U_y_bottom:U_y_top]
+    Ez_right_old = ez_Yee_old[U_x_right+1,U_y_bottom:U_y_top]
+    Hy_left = hy_Yee_old[U_x_left-1,U_y_bottom:U_y_top]
+    Hy_right = hy_Yee_old[U_x_right,U_y_bottom:U_y_top]
 
     # Ez and Hy implicitly updated in the UCHIE region
 #    [ez_U_new, hy_U_new] = update_implicit_hybrid_new(ez_U_old, hy_U_old, bx_U_old, n, A_inv, B, delta_t, delta_y_matrix_U, M_U, N_U, jz_U, mu_U, delta_x_Yee_left, delta_x_Yee_right, Ez_left_new, Ez_left_old, Ez_right_new, Ez_right_old, Hy_left, Hy_right)
@@ -333,11 +333,11 @@ for n in range(iterations):
     bx_term_left = np.divide(bx_U_new[0,:], np.multiply(mu_U[0,:], delta_y_matrix_U[0,:]))
     bx_term_right = np.divide(bx_U_new[-1,:], np.multiply(mu_U[-1,:], delta_y_matrix_U[-1,:]))
     
-    C_term_left[0,:] = (Ez_left_new + Ez_left_old)
-    C_term_right[0,:] = (Ez_right_new + Ez_right_old)
+    C_term_left[0,:] = (Ez_left_new + Ez_left_old)/(2*delta_x_Yee_left)/delta_t
+    C_term_right[0,:] = (Ez_right_new + Ez_right_old)/(2*delta_x_Yee_left)/delta_t
 
-    bx_term_left = np.divide(bx_U_new[0,:], np.multiply(mu_U[0,:], delta_y_matrix_U[0,:]))
-    C_term_left[1,:] = -bx_term_left + np.roll(bx_term_left, 1) - jz_U[0,:,n] - 2*Hy_left/delta_x_Yee_left
+    bx_term_left = np.divide(bx_U_new[0,:], mu_U[0,:])
+    C_term_left[1,:] = -bx_term_left + np.roll(bx_term_left, 1) - jz_U[0,:,n] - 2*Hy_left/delta_x_Yee_left*delta_y_Yee
     bx_term_right = np.divide(bx_U_new[-1,:], np.multiply(mu_U[-1,:], delta_y_matrix_U[-1,:]))
     C_term_right[1,:] = -bx_term_right + np.roll(bx_term_right, 1) - jz_U[0,:,n] + 2*Hy_right/delta_x_Yee_right
 
@@ -364,23 +364,26 @@ for n in range(iterations):
 
 #    hy_U_new[0,:] = hy_U_old[0,:] - delta_t*np.divide(0, np.multiply(mu_U, delta_x_U))
 
-    """
     Hy_Yee_left = hy_Yee_new[U_x_left,U_y_bottom:U_y_top]
     Hy_Yee_right = hy_Yee_new[U_x_right,U_y_bottom:U_y_top]
     Ez_Yee_left = ez_Yee_new[U_x_left,U_y_bottom:U_y_top]
     Ez_Yee_right = ez_Yee_new[U_x_right,U_y_bottom:U_y_top]
-    """
+
 
    # [ez_U_new, hy_U_new] = update_implicit_hybrid_zeros(ez_U_old, hy_U_old, bx_U_old, n, A_inv, B, delta_t, delta_y_matrix_U, M_U, N_U, jz_U, mu_U, delta_x_Yee_left, delta_x_Yee_right, 0, 0, Ez_Yee_left, Ez_Yee_right, Hy_Yee_left, Hy_Yee_right)
 
     # Bx explicitly updated in the UCHIE region (interpolation needed)
 
+    print(np.max(bx_U_old[:,1:-1]))
+    print(np.max((ez_U_new[:,2:] - ez_U_new[:,1:-1])))
+    print(np.max((np.dot(interpolate_matrix, ez_Yee_new[U_x_left:U_x_right+1,U_y_top+1]) - ez_U_new[:,-1])))
+    print(np.max((ez_U_new[:,1] - np.dot(interpolate_matrix, ez_Yee_new[U_x_left:U_x_right+1,U_y_bottom]))))
 
     bx_U_new = np.zeros((M_U, N_U))
     bx_U_new[:,1:-1] = bx_U_old[:,1:-1] - (ez_U_new[:,2:] - ez_U_new[:,1:-1])
-    bx_U_new[:,-1] = bx_U_old[:,-1] - (np.dot(interpolate_matrix, ez_Yee_new[U_x_left:U_x_right+1,U_y_top+1])*delta_t - ez_U_new[:,-1]) # add periodic boundary condition
+    bx_U_new[:,-1] = bx_U_old[:,-1] - (np.dot(interpolate_matrix, ez_Yee_new[U_x_left:U_x_right+1,U_y_top+1]) - ez_U_new[:,-1]) # add periodic boundary condition
     # ez_U[:,0] does not exist, or equivalently, is always zero.
-    bx_U_new[:,0] = bx_U_old[:,0] - (ez_U_new[:,1] - np.dot(interpolate_matrix, ez_Yee_new[U_x_left:U_x_right+1,U_y_bottom])*delta_t) # add periodic boundary condition
+    bx_U_new[:,0] = bx_U_old[:,0] - (ez_U_new[:,1] - np.dot(interpolate_matrix, ez_Yee_new[U_x_left:U_x_right+1,U_y_bottom])) # add periodic boundary condition
 
 
     """ #Should be executed, but does not work yet.
