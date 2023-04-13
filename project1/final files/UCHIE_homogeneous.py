@@ -8,11 +8,11 @@ from matplotlib.animation import FuncAnimation
 from functions import def_update_matrices, update_implicit, def_jz
 import scipy.optimize as opt
 
-Lx = 1 # Length in the x-direction in units m
-Ly = 1 # Length in the x-direction in units m
+Lx = 5 # Length in the x-direction in units m
+Ly = 5 # Length in the x-direction in units m
 
-M = 100 # Number of cells in the x-direction
-N = 100 # Number of cells in the y-direction
+M = 150 # Number of cells in the x-direction
+N = 150 # Number of cells in the y-direction
 partition = 'uniform' # delta_x and delta_y are then constants. If partition != uniform, these should be specified as arrays.
 
 iterations = 60 # Number of iterations. The total time length that is simulated is then equal to iterations * delta_t
@@ -47,7 +47,7 @@ delta_t = np.min(delta_y)/(c)*courant_number # in units s
 
 ### Definition of the source 
 # The source type should be either dirac, gaussian, or gaussian_modulated
-source = 'dirac' # type of the source
+source = 'gaussian' # type of the source
 x_source = 50 # x-coordinate of the source. Make sure this is within bounds.
 y_source = 50 # y-coordinate of the source. Make sure this is within bounds.
 J0 = 1 # amplitude of the source in units V^2 m A^-1
@@ -62,7 +62,7 @@ spectral_content = fft.fft(jz[x_source,y_source,:])[0]
 jz = jz/spectral_content
 
 observation_points_ez = [(x_source + i, y_source) for i in range(M//2)] # observation points for the electric field
-
+observation_points_ez = [(50, 60)]
 
 def update_bx(bx_old, ez_old):
     bx = np.zeros((M, N))
@@ -126,17 +126,16 @@ frequency_point = 20
 fft_transform_r_values = [i*delta_x[0] for i in range(M//2)]
 fft_list = []
 
-plt.plot(range(iterations), ez_list_observe[:,40])
-plt.show()
+#plt.plot(range(iterations), ez_list_observe[:,40])
+#plt.show()
 
 for i, point in enumerate(observation_points_ez):
-    """
     plt.plot(range(iterations), ez_list_observe[:,i])
     plt.xlabel('Time [s]')
     plt.ylabel('Ez')
     plt.title(f'Ez at {point}')
-    #plt.show()
-    """
+    plt.show()
+
     fft_transform = fft.fft(ez_list_observe[:,i])
     #plt.plot(fft_transform)
     #plt.show()
@@ -147,6 +146,7 @@ print(omega)
 
 omega = frequency_point/(iterations*delta_t)*6.25
 
+"""
 print(omega)
 plt.plot(fft_transform_r_values, fft_list, label = 'computational')
 plt.plot(fft_transform_r_values, np.array([hankel(i, omega) for i in fft_transform_r_values])*10**(-4.5), label = 'analytical')
@@ -157,7 +157,7 @@ plt.plot(fft_transform_r_values, fft_list, label = 'computational')
 plt.plot(np.array([hankel(delta_x[0]*i, 1/delta_t*frequency_point) for i in range(len(observation_points_ez))])/(3*10**(12)), label = 'analytical')
 plt.legend()
 plt.show()
-
+"""
 
 """
 plt.plot(d_list[10:-10], [i/2 for i in v_list[10:-10]], label = 'computationally')
