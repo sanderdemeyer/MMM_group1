@@ -3,6 +3,19 @@ import matplotlib.pyplot as plt
 import scipy.special as special
 import numpy.fft as fft
 
+import pickle
+
+
+with open('testje.pkl', 'rb') as f:
+    [A, M_U] = pickle.load(f)
+print(M_U)
+print(A)
+
+
+
+
+print(a)
+
 M_U = 3
 
 A = np.array([[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11], [12, 13, 14, 15]])
@@ -14,6 +27,15 @@ A[:,[1, M_U-1]] = A[:,[M_U-1, 1]]
 print(A)
 
 
+
+
+
+
+print(a)
+
+
+with open('testje.pkl', 'wb') as f:
+    pickle.dump([A, M_U], f)
 
 
 

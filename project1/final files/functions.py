@@ -30,6 +30,8 @@ def def_jz(J0, source, M, N, x_point, y_point, iterations, delta_t, tc, sigma_so
                     jz[i, j, n] = J0*np.sin(omega_c*n*delta_t)*np.exp(-(i**2 + j**2)/(2*sigma_source**2))
     elif source == 'dirac':
         jz[x_point, y_point, 0] = delta_value
+    else:
+        print('Invalid source name')
     return jz
 
 def def_update_matrices_new(epsilon, mu, sigma, delta_x, delta_y, delta_t, M):

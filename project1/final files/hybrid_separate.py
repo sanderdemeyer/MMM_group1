@@ -10,18 +10,19 @@ from functions import def_jz, def_update_matrices, def_update_matrices_hybrid, u
 import scipy.sparse.linalg as ssalg
 from scipy.sparse import csc_matrix
 
-Lx = 1 # Length in the x-direction in units m
-Ly = 1 # Length in the x-direction in units m
+Lx = 10 # Length in the x-direction in units m
+Ly_Yee = 10 # Length in the x-direction in units m
+Ly_U = 1
 
-M_Yee = 20 # Number of cells in the x-direction
-N_Yee = 20 # Number of cells in the y-direction
+M_Yee = 200 # Number of cells in the x-direction of the Yee region
+N_Yee = 200 # Number of cells in the y-direction of the Yee region
+N_U = 10 # Number of cells in the y-direction of the UCHIE region
 partition = 'uniform' # delta_x_Yee and delta_y_Yee are then constants. If partition != uniform, these should be specified as arrays.
 
 M_U_separate = [1 for i in range(M_Yee)] # For each Yee-cell, this denotes the number of UCHIE cells it is subdivided in.
 M_U = sum(M_U_separate) # The total number of UCHIE cells in the x-direction
-N_U = N_Yee # The total number of UCHIE cells in the y-direction. This 
 
-iterations = 60 # Number of iterations. The total time length that is simulated is then equal to iterations * delta_t
+iterations = 150 # Number of iterations. The total time length that is simulated is then equal to iterations * delta_t
 
 
 ### Definitions of physical constants
@@ -38,12 +39,17 @@ epsilon_U = np.ones((M_U,N_U))*epsilon_0
 mu_U = np.ones((M_U,N_U))*mu_0
 sigma_U = np.ones((M_U,N_U))*0 # in units kg m^3 s^-3 A^-2 = V m^2 A^-1
 
+epsilon_U[60:90,:] = np.ones((30,N_U))*3*epsilon_0
+epsilon_Yee[60:90,:] = np.ones((30,N_Yee))*3*epsilon_0
+
 if partition == 'uniform':
     delta_x_Yee = np.ones(M_Yee)*Lx/M_Yee
-    delta_y_Yee = np.ones(N_Yee)*Ly/N_Yee
+    delta_y_Yee = np.ones(N_Yee)*Ly_Yee/N_Yee
+    delta_y_U = np.ones(N_U)*Ly_U/N_U
 else:
     delta_x_Yee = 0 # specify explicitly
     delta_y_Yee = 0 # specify explicitly
+    delta_y_U = 0 # specify explicitly
 
 ### These matrices contain the delta_x and delta_y values at a given vertex. 
 delta_x_matrix_Yee = np.array([np.repeat(delta_x_Yee[i], N_Yee) for i in range(M_Yee)])
@@ -64,7 +70,6 @@ for i in range(M_Yee):
     interpolate_matrix[M_U_separate_cumsumlist[i]:M_U_separate_cumsumlist[i+1],i:i+2] = np.transpose([1-delta_x_U_fractions_cumsumlist[i], delta_x_U_fractions_cumsumlist[i]])
 
 delta_x_U = np.array([delta_x_U_fractions[i,:]*delta_x_Yee[i] for i in range(M_Yee)]).flatten()
-delta_y_U = delta_y_Yee
 
 delta_x_matrix_U = np.array([np.repeat(delta_x_U[i], N_U) for i in range(M_U)])
 delta_y_matrix_U = np.array([delta_y_U for i in range(M_U)])
@@ -80,21 +85,21 @@ delta_t = (courant_number/c)*min(np.max(delta_y_U), 1/(np.sqrt(1/(np.max(delta_x
 
 # Yee source
 source_Yee = 'gaussian_modulated' # type of the source
-source_X_Yee = 5 # x-coordinate of the source. Make sure this is within bounds.
-source_Y_Yee = 5 # y-coordinate of the source. Make sure this is within bounds.
-J0_Yee = 0 # amplitude of the source in units V^2 m A^-1
+source_X_Yee = 50 # x-coordinate of the source. Make sure this is within bounds.
+source_Y_Yee = 100 # y-coordinate of the source. Make sure this is within bounds.
+J0_Yee = 1 # amplitude of the source in units V^2 m A^-1
 tc_Yee = 5 # tc*delta_t is the time the source peaks
-sigma_source_Yee = 1 # spread of the source in the case of gaussian or gaussian_modulated source
+sigma_source_Yee = 2.2 # spread of the source in the case of gaussian or gaussian_modulated source
 period_Yee = 10 # period of the source in number of time steps in the case of gaussian or gaussian_modulated source
 omega_c_Yee = (2*np.pi)/(period_Yee*delta_t) # angular frequency of the source in the case of gaussian or gaussian_modulated source
 
 # UCHIE source
-source_U = 'dirac' # type of the source
-source_X_U = 5 # x-coordinate of the source. Make sure this is within bounds.
-source_Y_U = 5 # y-coordinate of the source. Make sure this is within bounds.
-J0_U = 1 # amplitude of the source in units V^2 m A^-1
+source_U = 'gaussian_modulated' # type of the source
+source_X_U = 45 # x-coordinate of the source. Make sure this is within bounds.
+source_Y_U = 25 # y-coordinate of the source. Make sure this is within bounds.
+J0_U = 0 # amplitude of the source in units V^2 m A^-1
 tc_U = 5 # tc*delta_t is the time the source peaks
-sigma_source_U = 1 # spread of the source in the case of gaussian or gaussian_modulated source
+sigma_source_U = 2 # spread of the source in the case of gaussian or gaussian_modulated source
 period_U = 10 # period of the source in number of time steps in the case of gaussian or gaussian_modulated source
 omega_c_U = (2*np.pi)/(period_U*delta_t) # angular frequency of the source in the case of gaussian or gaussian_modulated source
 
@@ -119,17 +124,20 @@ hy_U_new = np.zeros((M_U, N_U))
 bx_U_new = np.zeros((M_U, N_U))
 
 ### Value of the sources based on the definitions above.
-jz_U = def_jz(J0_U, source_U, M_U, N_U, source_X_U, source_Y_U, iterations, 1/(delta_x_U[0]*delta_y_U[0]), tc_U, sigma_source_U, period_U)
-jz_Yee = def_jz(J0_Yee, source_Yee, M_Yee, N_Yee, source_X_Yee, source_Y_Yee, iterations, 1/(delta_x_Yee[0]*delta_y_Yee[0]), tc_Yee, sigma_source_Yee, period_Yee)
+jz_U = def_jz(J0_U, source_U, M_U, N_U, source_X_U, source_Y_U, iterations, delta_t, tc_U, sigma_source_U, period_U, 1/(delta_x_U[0]*delta_y_U[0]))
+jz_Yee = def_jz(J0_Yee, source_Yee, M_Yee, N_Yee, source_X_Yee, source_Y_Yee, iterations, delta_t, tc_Yee, sigma_source_Yee, period_Yee, 1/(delta_x_Yee[0]*delta_y_Yee[0]))
 
 ### Definition of the UCHIE implicit update matrices.
 [A, B] = def_update_matrices(epsilon_U, mu_U, sigma_U, delta_x_U, delta_y_U, delta_t, M_U)
 
-M11 = A[:M_U+1,:M_U+1]
-M12 = A[:M_U+1,M_U+1:]
-M21 = A[M_U+1:,:M_U+1]
-M22 = A[M_U+1:,M_U+1:]
-M22_inv = linalg.inv(M22)
+observation_point_U = ((75, 25))
+observation_points_ez_U = [] # [observation_point_U]
+ez_U_list_observe = np.zeros((iterations, len(observation_points_ez_U)))
+
+observation_point_Yee = ((75, 100))
+observation_points_ez_Yee = [observation_point_Yee]
+ez_Yee_list_observe = np.zeros((iterations, len(observation_points_ez_Yee)))
+
 
 # Determining the type of inversion that is used.
 # Options are numpy_nonsparse, numpy_sparse, schur_sparse, schur_nonsparse
@@ -139,14 +147,47 @@ inversion_method = 'numpy_nonsparse'
 if inversion_method == 'numpy_nonsparse':
     A_inv = linalg.inv(A)
 elif inversion_method == 'numpy_sparse':
-    print('TBA')
-    pass
-elif inversion_method == 'schur_sparse':
-    print('TBA')
-    pass
-elif inversion_method == 'schur_nonsparse':
-    print('TBA')
-    pass
+    A_csc = csc_matrix(A)
+    A_inv_csc = ssalg.inv(A_csc)
+    A_inv = A_inv_csc.toarray()
+elif inversion_method == 'numpy_schur':
+    M11 = A[:M_U+1,:M_U+1]
+    M12 = A[:M_U+1,M_U+1:]
+    M21 = A[M_U+1:,:M_U+1]
+    M22 = A[M_U+1:,M_U+1:]
+    M22_inv = linalg.inv(M22)
+    S = M11 - np.dot(M12,np.dot(M22_inv,M21))
+    S_inv = linalg.inv(S)
+    A_inv = np.zeros((2*M_U,2*M_U))
+    Deel1 = S_inv
+    Deel2 =  -np.dot(S_inv,np.dot(M12,M22_inv))
+    Deel3 = -np.dot(M22_inv,np.dot(M21,S_inv))
+    Deel4 =  M22_inv + np.dot(M22_inv,np.dot(M21,np.dot(S_inv,np.dot(M12,M22_inv))))
+    A_inv[:M_U+1,:M_U+1] = Deel1
+    A_inv[:M_U+1,M_U+1:] = Deel2
+    A_inv[M_U+1:,:M_U+1] = Deel3
+    A_inv[M_U+1:,M_U+1:] = Deel4
+elif inversion_method == 'numpy_sparse_schur':
+    M11 = csc_matrix(A[:M_U+1,:M_U+1])
+    M12 = csc_matrix(A[:M_U+1,M_U+1:])
+    M21 = csc_matrix(A[M_U+1:,:M_U+1])
+    M22 = csc_matrix(A[M_U+1:,M_U+1:])
+    M22_inv = ssalg.inv(M22)
+    S = M11 - M12*M22_inv*M21
+    S_inv = ssalg.inv(S)
+    M_inv = np.zeros((2*M_U,2*M_U))
+    Deel1 = S_inv
+    Deel2 =  -S_inv*M12*M22_inv
+    Deel3 = -M22_inv*M21*S_inv
+    Deel4 =  M22_inv + M22_inv*M21*S_inv*M12*M22_inv
+    M_inv[:M_U+1,:M_U+1] = Deel1.toarray()
+    M_inv[:M_U+1,M_U+1:] = Deel2.toarray()
+    M_inv[M_U+1:,:M_U+1] = Deel3.toarray()
+    M_inv[M_U+1:,M_U+1:] = Deel4.toarray()
+    A_inv = M_inv
+else:
+    print('Invalid inversion method')
+
 
 # initialization of the list of fields
 bx_Yee_list = np.zeros((M_Yee, N_Yee, iterations))
@@ -204,13 +245,6 @@ for n in range(iterations):
     ez_bottom.append(ez_Yee_new[0,-1])
     ez_bottom = np.array(ez_bottom)
 
-    if n < 15:
-        print('top')
-        print(np.dot(interpolate_matrix, ez_top))
-        print(ez_U_new[:,-1])
-        print('bottom')
-        print(np.dot(interpolate_matrix, ez_bottom))
-        print(ez_U_new[:,1])
     bx_U_new[:,-1] = bx_U_old[:,-1] - (np.dot(interpolate_matrix, ez_top)*delta_t - ez_U_new[:,-1]) # add periodic boundary condition
     # ez_U[:,0] does not exist, or equivalently, is always zero.
     # bottom
@@ -251,7 +285,28 @@ for n in range(iterations):
     ez_U_list[:,:,n] = ez_U_new
     hy_U_list[:,:,n] = hy_U_new
 
-animation_speed = 1
+    for i, point in enumerate(observation_points_ez_U):
+        ez_U_list_observe[n, i] = ez_U_new[point]
+
+    for i, point in enumerate(observation_points_ez_Yee):
+        ez_Yee_list_observe[n, i] = ez_Yee_new[point]
+
+animation_speed = 5
+
+for i, point in enumerate(observation_points_ez_U):
+    plt.plot(range(iterations), ez_U_list_observe[:,i])
+    plt.xlabel('Iteration')
+    plt.ylabel('Ez in UCHIE region')
+    plt.title(f'Ez at {point}')
+    plt.show()
+
+for i, point in enumerate(observation_points_ez_Yee):
+    plt.plot(range(iterations), ez_Yee_list_observe[:,i])
+    plt.xlabel('Iteration')
+    plt.ylabel('Ez in Yee region')
+    plt.title(f'Ez at {point}')
+    plt.show()
+
 
 fig, ax = plt.subplots()
 ax.set_xlabel('X')

@@ -6,17 +6,16 @@ import scipy.special as special
 from matplotlib.pyplot import pcolormesh
 from matplotlib.animation import FuncAnimation
 from functions import def_update_matrices, update_implicit, def_jz
-from  material_properties import EM_properties, material_grid
-import matplotlib.patches as patches
+import scipy.optimize as opt
 
-Lx = 100 # Length in the x-direction in units m
-Ly = 100 # Length in the x-direction in units m
+Lx = 10 # Length in the x-direction in units m
+Ly = 10 # Length in the x-direction in units m
 
-M = 500 # Number of cells in the x-direction
-N = 500 # Number of cells in the y-direction
+M = 400 # Number of cells in the x-direction
+N = 400 # Number of cells in the y-direction
 partition = 'uniform' # delta_x and delta_y are then constants. If partition != uniform, these should be specified as arrays.
 
-iterations = 450 # Number of iterations. The total time length that is simulated is then equal to iterations * delta_t
+iterations = 350 # Number of iterations. The total time length that is simulated is then equal to iterations * delta_t
 
 
 ### Definitions of physical constants
@@ -29,26 +28,9 @@ epsilon = np.ones((M,N))*epsilon_0
 mu = np.ones((M,N))*mu_0
 sigma = np.ones((M,N))*0 # in units kg m^3 s^-3 A^-2 = V m^2 A^-1
 
-Si_left = 80
-Si_right = 120
-Cu_left = 70
-Cu_right = 72
-
-
-material_list = [['Silicon', Si_left, Si_right, 'blue'], ['Copper', Cu_left, Cu_right, 'red']]
-material_list = [['Copper', Cu_left, Cu_right, 'red']]
-materials = material_grid(material_list)
-
-
-#[epsilon, mu, sigma] = materials.set_properties(epsilon, mu, sigma)
-
-# epsilon[60:90,:] = np.ones((30,N))*3*epsilon_0
-
 if partition == 'uniform':
     delta_x = np.ones(M)*Lx/M
     delta_y = np.ones(N)*Ly/N
-
-   # delta_x[Cu_left:Cu_right] = delta_x[Cu_left:Cu_right]/1000
 else:
     delta_x = 0 # specify explicitly
     delta_y = 0 # specify explicitly
@@ -63,16 +45,14 @@ delta_y_matrix = np.array([delta_y for i in range(M)])
 courant_number = 1
 delta_t = np.min(delta_y)/(c)*courant_number # in units s
 
-print(f'duration is {delta_t*iterations} seconds')
-
 ### Definition of the source 
 # The source type should be either dirac, gaussian, gaussian_modulated, or gaussian_modulated_dirac
-source = 'dirac' # type of the source
-x_source = 250 # x-coordinate of the source. Make sure this is within bounds.
-y_source = 250 # y-coordinate of the source. Make sure this is within bounds.
+source = 'gaussian_modulated_dirac' # type of the source
+x_source = M//2 # x-coordinate of the source. Make sure this is within bounds.
+y_source = N//2 # y-coordinate of the source. Make sure this is within bounds.
 J0 = 1 # amplitude of the source in units V^2 m A^-1
-tc = 5 # tc*delta_t is the time the source peaks
-sigma_source = 2.2 # spread of the source in the case of gaussian or gaussian_modulated source
+tc = 10 # tc*delta_t is the time the source peaks
+sigma_source = 1 # spread of the source in the case of gaussian or gaussian_modulated source
 period = 10 # period of the source in number of time steps in the case of gaussian or gaussian_modulated source
 omega_c = (2*np.pi)/(period*delta_t) # angular frequency of the source in the case of gaussian or gaussian_modulated source
 
@@ -83,7 +63,7 @@ jz = jz/spectral_content
 
 observation_points_ez = [(x_source + i, y_source) for i in range(M//2)] # observation points for the electric field
 
-observation_point = ((275, 250))
+observation_point = ((M//2, int(M*3/5)))
 observation_points_ez = [observation_point]
 
 def update_bx(bx_old, ez_old):
@@ -140,26 +120,6 @@ def run_UCHIE():
 [bx_list, ez_list, hy_list, ez_list_observe] = run_UCHIE()
 
 
-animation_speed = 3
-
-fig, ax = plt.subplots()
-ax.set_xlabel('Y')
-ax.set_ylabel('X')
-ax.set_aspect('equal', adjustable='box')
-for mat in material_list:
-    rect = patches.Rectangle((mat[1], 0), mat[2]-mat[1], N-1, edgecolor = mat[3], linewidth=1, facecolor="none", label = mat[0])
-    ax.add_patch(rect)
-
-def animate(i):
-    ax.pcolormesh(np.transpose(ez_list[:,:,int(i*animation_speed)]))
-    ax.set_title(f'n = {int(i*animation_speed)}')
-    for mat in material_list:
-        rect = patches.Rectangle((mat[1], 0), mat[2]-mat[1]-1, N-1, edgecolor = mat[3], linewidth=1, facecolor="none", label = mat[0])
-        ax.add_patch(rect)
-anim = FuncAnimation(fig, animate)
-plt.legend()
-plt.show()
-
 def hankel(x, f, J0=1):
     omega = 2*np.pi*f
     return -(J0*omega*mu_0/4)*special.hankel2(0, (omega*x/c))
@@ -191,6 +151,10 @@ frequencies = fft.fftfreq(iterations, delta_t)
 fft_transform_source = fft.fft(jz[x_source, y_source,:])
 
 
+
+
+print('ok')
+
 plt.plot(frequencies[:iterations//2], fft_transform[:iterations//2])
 plt.title('ez')
 plt.show()
@@ -199,24 +163,29 @@ plt.plot(frequencies[:iterations//2], fft_transform_source[:iterations//2])
 plt.title('source')
 plt.show()
 
-dist = np.sqrt(delta_x[x_source](observation_point[0]-x_source)**2 + delta_y[y_source](observation_point[1]-y_source)**2)
+dist = delta_x[0]*np.sqrt((observation_point[0]-x_source)**2 + (observation_point[1]-y_source)**2)
+print(abs(np.divide(fft_transform[1:iterations//2], fft_transform_source[1:iterations//2])))
+print([abs(hankel(dist, omega)) for omega in frequencies[:iterations//2]])
+print(np.divide(abs(np.divide(fft_transform[1:iterations//2], fft_transform_source[1:iterations//2])),[abs(hankel(dist, omega)) for omega in frequencies[1:iterations//2]]))
 
-plt.plot(2*np.pi*frequencies[1:iterations//2], abs(np.divide(fft_transform[1:iterations//2], fft_transform_source[1:iterations//2])), label = 'computational')
+plt.plot(2*np.pi*frequencies[iterations//2], abs(np.divide(fft_transform[iterations//2], fft_transform_source[iterations//2])), label = 'computational')
+
 plt.plot(2*np.pi*frequencies[:iterations//2], delta_t*delta_x[x_source]*delta_y[x_source]*np.array([abs(hankel(dist, omega)) for omega in frequencies[:iterations//2]]), label = 'analytical')
 plt.legend()
+plt.xlim(0, 6*10**9)
+plt.ylim(0, 5*10**(-13))
 plt.show()
+
+import pickle
+
+with open('latest_test.pkl', 'wb') as f:
+    pickle.dump([frequencies, iterations, fft_transform, fft_transform_source, x_source, y_source, delta_t, delta_x, delta_y, dist], f)
+
 
 omega = 1/delta_t*frequency_point/delta_x[0]*1
 print(omega)
 
 omega = frequency_point/(iterations*delta_t)*6.25
-
-
-import pickle
-
-with open('variables_smaller_frequencies_dirac_dirac.pkl', 'wb') as f:
-    pickle.dump([frequencies, iterations, fft_transform, fft_transform_source, x_source, y_source, delta_t, delta_x, delta_y, dist, omega, ], f)
-
 
 """
 print(omega)
@@ -238,3 +207,21 @@ plt.legend()
 plt.show()
 """
 
+animation_speed = 1
+
+fig, ax = plt.subplots()
+ax.set_xlabel('Y')
+ax.set_ylabel('X')
+ax.set_aspect('equal', adjustable='box')
+
+def animate(i):
+   ax.pcolormesh(np.transpose(ez_list[:,:,int(i*animation_speed)]))
+   ax.set_title(f'n = {int(i*animation_speed)}')
+
+
+print(bx_list[:,:,10])
+print(ez_list[:,:,10])
+print(hy_list[:,:,10])
+
+anim = FuncAnimation(fig, animate)
+plt.show()
