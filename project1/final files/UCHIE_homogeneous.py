@@ -8,15 +8,16 @@ from matplotlib.animation import FuncAnimation
 from functions import def_update_matrices, update_implicit, def_jz
 from  material_properties import Material, Material_grid
 import matplotlib.patches as patches
+import pickle
 
 Lx = 10 # Length in the x-direction in units m
 Ly = 10 # Length in the x-direction in units m
 
-M = 150 # Number of cells in the x-direction
-N = 150 # Number of cells in the y-direction
+M = 200 # Number of cells in the x-direction
+N = 200 # Number of cells in the y-direction
 partition = 'uniform' # delta_x and delta_y are then constants. If partition != uniform, these should be specified as arrays.
 
-iterations = 150 # Number of iterations. The total time length that is simulated is then equal to iterations * delta_t
+iterations = 450 # Number of iterations. The total time length that is simulated is then equal to iterations * delta_t
 
 
 ### Definitions of physical constants
@@ -29,20 +30,31 @@ epsilon = np.ones((M,N))*epsilon_0
 mu = np.ones((M,N))*mu_0
 sigma = np.ones((M,N))*0 # in units kg m^3 s^-3 A^-2 = V m^2 A^-1
 
-Si_left = 40
-Si_right = 60
-Cu_left = 100
-Cu_right = 120
-
-
 Si = Material('Silicon')
 Cu = Material('Copper')
-New = Material(['new_mat', 3, 1, 0])
+SiO2 = Material('Silica')
+Mat3 = Material(['epsilon_r_3', 3, 1, 0])
 
-material_list = [[Si, Si_left, Si_right, 'blue'], [Cu, Cu_left, Cu_right, 'red'], [New, 130, 140, 'yellow']]
+grid = 'MIS'
+
+if grid == 'dielectric':
+    left = 100
+    right = 140
+
+    material_list = [[Mat3, left, right, 'blue']]
+elif grid == 'MIS':
+    Si_left = 100
+    Si_right = 120
+    SiO2_right = 125
+    Cu_right = 130
+
+    material_list = [[Si, Si_left, Si_right, 'blue'], 
+                     [SiO2, Si_right, SiO2_right, 'yellow'],
+                     [Cu, SiO2_right, Cu_right, 'red']
+                     ]
+
+
 material_grid = Material_grid(material_list)
-
-
 [epsilon, mu, sigma] = material_grid.set_properties(epsilon, mu, sigma)
 
 # epsilon[60:90,:] = np.ones((30,N))*3*epsilon_0
@@ -51,8 +63,8 @@ if partition == 'uniform':
     delta_x = np.ones(M)*Lx/M
     delta_y = np.ones(N)*Ly/N
 
-    delta_x[Cu_left:Cu_right] = delta_x[Cu_left:Cu_right]/100
-    delta_x[Si_left:Si_right] = delta_x[Si_left:Si_right]/10
+   # delta_x[Cu_left:Cu_right] = delta_x[Cu_left:Cu_right]/100
+   # delta_x[Si_left:Si_right] = delta_x[Si_left:Si_right]/10
 else:
     delta_x = 0 # specify explicitly
     delta_y = 0 # specify explicitly
@@ -71,9 +83,9 @@ print(f'duration is {delta_t*iterations} seconds')
 
 ### Definition of the source 
 # The source type should be either dirac, gaussian, gaussian_modulated, or gaussian_modulated_dirac
-source = 'dirac' # type of the source
-x_source = 30 # x-coordinate of the source. Make sure this is within bounds.
-y_source = 75 # y-coordinate of the source. Make sure this is within bounds.
+source = 'gaussian_modulated' # type of the source
+x_source = 60 # x-coordinate of the source. Make sure this is within bounds.
+y_source = 100 # y-coordinate of the source. Make sure this is within bounds.
 J0 = 1 # amplitude of the source in units V^2 m A^-1
 tc = 5 # tc*delta_t is the time the source peaks
 sigma_source = 2.2 # spread of the source in the case of gaussian or gaussian_modulated source
@@ -87,7 +99,7 @@ jz = jz/spectral_content
 
 observation_points_ez = [(x_source + i, y_source) for i in range(M//2)] # observation points for the electric field
 
-observation_point = ((80, 75))
+observation_point = ((80, 100))
 observation_points_ez = [observation_point]
 
 def update_bx(bx_old, ez_old):
@@ -178,10 +190,18 @@ fft_list = []
 #plt.plot(range(iterations), ez_list_observe[:,40])
 #plt.show()
 
+with open('Yee_epsr_3.pkl', 'rb') as f:
+    [ez_Yee_list_observe, iterations_Yee, times_Yee] = pickle.load(f)
+
+times = [i*delta_t for i in range(iterations)]
+
 for i, point in enumerate(observation_points_ez):
-    plt.plot(range(iterations), ez_list_observe[:,i])
+    plt.plot(times_Yee, ez_Yee_list_observe[:,i], label = 'Yee')
+
+    plt.plot(times, ez_list_observe[:,i]*4.47, label = 'UCHIE')
     plt.xlabel('Time [s]')
     plt.ylabel('Ez')
     plt.title(f'Ez at {point}')
+    plt.legend()
     plt.show()
 
