@@ -34,6 +34,10 @@ plt.show()
 
 plt.plot(frequencies[:iterations//2], fft_transform[:iterations//2])
 plt.title('ez')
+plt.xlabel(r'$ \omega $ [Hz]')
+plt.ylabel('Frequency respons')
+plt.title(f'Frequency respons at distance {dist} m from the source')
+
 plt.show()
 
 plt.plot(frequencies[:iterations//2], fft_transform_source[:iterations//2])

@@ -157,6 +157,9 @@ print('ok')
 
 plt.plot(frequencies[:iterations//2], fft_transform[:iterations//2])
 plt.title('ez')
+plt.xlabel(r'$ \omega $ [Hz]')
+plt.title(r'Fourier transform of $ e_z $')
+plt.ylabel(r'Fourier transform of $ e_z $ [V s / m]')
 plt.show()
 
 plt.plot(frequencies[:iterations//2], fft_transform_source[:iterations//2])
@@ -164,17 +167,27 @@ plt.title('source')
 plt.show()
 
 dist = delta_x[0]*np.sqrt((observation_point[0]-x_source)**2 + (observation_point[1]-y_source)**2)
-print(abs(np.divide(fft_transform[1:iterations//2], fft_transform_source[1:iterations//2])))
-print([abs(hankel(dist, omega)) for omega in frequencies[:iterations//2]])
-print(np.divide(abs(np.divide(fft_transform[1:iterations//2], fft_transform_source[1:iterations//2])),[abs(hankel(dist, omega)) for omega in frequencies[1:iterations//2]]))
 
-plt.plot(2*np.pi*frequencies[iterations//2], abs(np.divide(fft_transform[iterations//2], fft_transform_source[iterations//2])), label = 'computational')
+lijst1 =  abs(np.divide(fft_transform[1:iterations//2], fft_transform_source[1:iterations//2]))
+lijst2 = delta_t*delta_x[x_source]*delta_y[x_source]*np.array([abs(hankel(dist, omega)) for omega in frequencies[1:iterations//2]])
 
-plt.plot(2*np.pi*frequencies[:iterations//2], delta_t*delta_x[x_source]*delta_y[x_source]*np.array([abs(hankel(dist, omega)) for omega in frequencies[:iterations//2]]), label = 'analytical')
+plt.plot(2*np.pi*frequencies[1:iterations//2], abs(np.divide(fft_transform[1:iterations//2], fft_transform_source[1:iterations//2]))*10**(11), label = 'computational')
+
+plt.plot(2*np.pi*frequencies[1:iterations//2], delta_t*delta_x[x_source]*delta_y[x_source]*np.array([abs(hankel(dist, omega))*10**(11) for omega in frequencies[1:iterations//2]]), label = 'analytical')
 plt.legend()
-plt.xlim(0, 6*10**9)
-plt.ylim(0, 5*10**(-13))
+plt.xlim(0, 12.5*10**9)
+#plt.ylim(0, 5*10**(-13))
+plt.ylim(top=3)
+plt.xlabel(r'$ \omega $ [Hz]')
+plt.ylabel('Frequency respons [rescaled]')
+plt.title(f'Frequency respons at distance {dist} m from the source')
 plt.show()
+
+
+print(abs(np.divide(fft_transform[iterations//2], fft_transform_source[iterations//2])))
+print(delta_t*delta_x[x_source]*delta_y[x_source]*np.array([abs(hankel(dist, omega)) for omega in frequencies[:iterations//2]]))
+
+print('done')
 
 import pickle
 
