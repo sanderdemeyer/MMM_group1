@@ -151,10 +151,6 @@ frequencies = fft.fftfreq(iterations, delta_t)
 fft_transform_source = fft.fft(jz[x_source, y_source,:])
 
 
-
-
-print('ok')
-
 plt.plot(frequencies[:iterations//2], fft_transform[:iterations//2])
 plt.title('ez')
 plt.xlabel(r'$ \omega $ [Hz]')
@@ -184,42 +180,8 @@ plt.title(f'Frequency respons at distance {dist} m from the source')
 plt.show()
 
 
-print(abs(np.divide(fft_transform[iterations//2], fft_transform_source[iterations//2])))
-print(delta_t*delta_x[x_source]*delta_y[x_source]*np.array([abs(hankel(dist, omega)) for omega in frequencies[:iterations//2]]))
-
-print('done')
-
-import pickle
-
-with open('latest_test.pkl', 'wb') as f:
-    pickle.dump([frequencies, iterations, fft_transform, fft_transform_source, x_source, y_source, delta_t, delta_x, delta_y, dist], f)
-
-
-omega = 1/delta_t*frequency_point/delta_x[0]*1
-print(omega)
-
-omega = frequency_point/(iterations*delta_t)*6.25
 
 """
-print(omega)
-plt.plot(fft_transform_r_values, fft_list, label = 'computational')
-plt.plot(fft_transform_r_values, np.array([hankel(i, omega) for i in fft_transform_r_values])*10**(-4.5), label = 'analytical')
-plt.legend()
-plt.show()
-
-plt.plot(fft_transform_r_values, fft_list, label = 'computational')
-plt.plot(np.array([hankel(delta_x[0]*i, 1/delta_t*frequency_point) for i in range(len(observation_points_ez))])/(3*10**(12)), label = 'analytical')
-plt.legend()
-plt.show()
-"""
-
-"""
-plt.plot(d_list[10:-10], [i/2 for i in v_list[10:-10]], label = 'computationally')
-#plt.plot(d_list, [hankel(x+1) for x in d_list], label = 'exact solution')
-plt.legend()
-plt.show()
-"""
-
 animation_speed = 1
 
 fig, ax = plt.subplots()
@@ -238,3 +200,4 @@ print(hy_list[:,:,10])
 
 anim = FuncAnimation(fig, animate)
 plt.show()
+"""

@@ -5,6 +5,8 @@ import numpy.fft as fft
 
 import pickle
 
+print(isinstance(5, float))
+
 
 with open('testje.pkl', 'rb') as f:
     [A, M_U] = pickle.load(f)

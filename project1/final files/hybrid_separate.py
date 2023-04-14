@@ -9,20 +9,22 @@ import copy
 from functions import def_jz, def_update_matrices, def_update_matrices_hybrid, update_implicit, update_implicit_hybrid, def_update_matrices_hybrid_new, update_implicit_hybrid_new, update_implicit_hybrid_zeros
 import scipy.sparse.linalg as ssalg
 from scipy.sparse import csc_matrix
+from  material_properties import Material, Material_grid
+import matplotlib.patches as patches
 
 Lx = 10 # Length in the x-direction in units m
 Ly_Yee = 10 # Length in the x-direction in units m
-Ly_U = 1
+Ly_U = 10
 
 M_Yee = 200 # Number of cells in the x-direction of the Yee region
 N_Yee = 200 # Number of cells in the y-direction of the Yee region
-N_U = 10 # Number of cells in the y-direction of the UCHIE region
+N_U = 200 # Number of cells in the y-direction of the UCHIE region
 partition = 'uniform' # delta_x_Yee and delta_y_Yee are then constants. If partition != uniform, these should be specified as arrays.
 
 M_U_separate = [1 for i in range(M_Yee)] # For each Yee-cell, this denotes the number of UCHIE cells it is subdivided in.
 M_U = sum(M_U_separate) # The total number of UCHIE cells in the x-direction
 
-iterations = 150 # Number of iterations. The total time length that is simulated is then equal to iterations * delta_t
+iterations = 750 # Number of iterations. The total time length that is simulated is then equal to iterations * delta_t
 
 
 ### Definitions of physical constants
@@ -32,15 +34,39 @@ c = 3*10**8 # in units m/s
 
 ### Definition of the material properties. These properties should not depend on the y-coordinate.
 epsilon_Yee = np.ones((M_Yee,N_Yee))*epsilon_0
-mM_Yee = np.ones((M_Yee,N_Yee))*mu_0
+mu_Yee = np.ones((M_Yee,N_Yee))*mu_0
 sigma_Yee = np.ones((M_Yee,N_Yee))*0 # in units kg m^3 s^-3 A^-2 = V m^2 A^-1
 
 epsilon_U = np.ones((M_U,N_U))*epsilon_0
 mu_U = np.ones((M_U,N_U))*mu_0
 sigma_U = np.ones((M_U,N_U))*0 # in units kg m^3 s^-3 A^-2 = V m^2 A^-1
 
-epsilon_U[60:90,:] = np.ones((30,N_U))*3*epsilon_0
-epsilon_Yee[60:90,:] = np.ones((30,N_Yee))*3*epsilon_0
+
+Si = Material('Silicon')
+Cu = Material('Copper')
+
+
+
+Si_left = 60
+Si_right = 80
+Cu_left = 100
+Cu_right = 120
+
+material_list_Yee = [[Si, Si_left, Si_right, 'blue'], [Cu, Cu_left, Cu_right, 'red']]
+material_grid_Yee = Material_grid(material_list_Yee)
+
+Si_left = 60
+Si_right = 80
+Cu_left = 100
+Cu_right = 120
+
+material_list_U = [[Si, Si_left, Si_right, 'blue'], [Cu, Cu_left, Cu_right, 'red']]
+material_grid_U = Material_grid(material_list_U)
+
+
+[epsilon_Yee, mu_Yee, sigma_Yee] = material_grid_Yee.set_properties(epsilon_Yee, mu_Yee, sigma_Yee)
+[epsilon_U, mu_U, sigma_U] = material_grid_U.set_properties(epsilon_U, mu_U, sigma_U)
+
 
 if partition == 'uniform':
     delta_x_Yee = np.ones(M_Yee)*Lx/M_Yee
@@ -112,7 +138,7 @@ eps_sigma_min_U = epsilon_U/delta_t - sigma_U/2
 eps_sigma_plus_Yee = epsilon_Yee/delta_t + sigma_Yee/2
 eps_sigma_min_Yee = epsilon_Yee/delta_t - sigma_Yee/2
 
-eq2_matrix = np.divide(delta_t, np.multiply(mM_Yee, delta_x_matrix_Yee))
+eq2_matrix = np.divide(delta_t, np.multiply(mu_Yee, delta_x_matrix_Yee))
 
 ### Initialization of all the fields.
 ez_Yee_new = np.zeros((M_Yee, N_Yee))
@@ -213,7 +239,7 @@ for n in range(iterations):
 
     # Update ez in Yee region
     eq_4_hy = np.divide(hy_Yee_old, delta_x_matrix_Yee)
-    eq_4_bx = np.divide(bx_Yee_old, np.multiply(delta_y_matrix_Yee, mM_Yee))
+    eq_4_bx = np.divide(bx_Yee_old, np.multiply(delta_y_matrix_Yee, mu_Yee))
     eq_4_term = np.multiply(eps_sigma_min_Yee, ez_Yee_old) - (jz_Yee[:,:,n]+jz_Yee[:,:,n-1])/2 + eq_4_hy - np.roll(eq_4_hy, 1, 0) - eq_4_bx + np.roll(eq_4_bx, 1, 1)
     ez_Yee_new = np.divide(eq_4_term, eps_sigma_plus_Yee)
 
@@ -312,24 +338,37 @@ fig, ax = plt.subplots()
 ax.set_xlabel('X')
 ax.set_ylabel('Y')
 ax.set_aspect('equal', adjustable='box')
+for mat in material_list_Yee:
+    rect = patches.Rectangle((mat[1], 0), mat[2]-mat[1], N_Yee-1, edgecolor = mat[3], linewidth=1, facecolor="none", label = mat[0].name)
+    ax.add_patch(rect)
 
 def animate(i):
-   ax.pcolormesh(np.transpose(ez_Yee_list[:,:,int(i*animation_speed)]))
-   ax.set_title(f'n = {int(i*animation_speed)}')
+    ax.pcolormesh(np.transpose(ez_Yee_list[:,:,int(i*animation_speed)]))
+    ax.set_title(f'n = {int(i*animation_speed)}')
+    for mat in material_list_Yee:
+        rect = patches.Rectangle((mat[1], 0), mat[2]-mat[1]-1, N_Yee-1, edgecolor = mat[3], linewidth=1, facecolor="none", label = mat[0].name)
+        ax.add_patch(rect)
 
 
 anim = FuncAnimation(fig, animate)
+plt.legend()
 plt.show()
 
 fig, ax = plt.subplots()
 ax.set_xlabel('X')
 ax.set_ylabel('Y')
 ax.set_aspect('equal', adjustable='box')
+for mat in material_list_U:
+    rect = patches.Rectangle((mat[1], 0), mat[2]-mat[1], N_U-1, edgecolor = mat[3], linewidth=1, facecolor="none", label = mat[0].name)
+    ax.add_patch(rect)
 
 def animate(i):
-   ax.pcolormesh(np.transpose(ez_U_list[:,:,int(i*animation_speed)]))
-   ax.set_title(f'n = {int(i*animation_speed)}')
-
+    ax.pcolormesh(np.transpose(ez_U_list[:,:,int(i*animation_speed)]))
+    ax.set_title(f'n = {int(i*animation_speed)}')
+    for mat in material_list_U:
+        rect = patches.Rectangle((mat[1], 0), mat[2]-mat[1]-1, N_U-1, edgecolor = mat[3], linewidth=1, facecolor="none", label = mat[0].name)
+        ax.add_patch(rect)
 
 anim = FuncAnimation(fig, animate)
+plt.legend()
 plt.show()

@@ -6,7 +6,7 @@ import scipy.special as special
 from matplotlib.pyplot import pcolormesh
 from matplotlib.animation import FuncAnimation
 from functions import def_update_matrices, update_implicit, def_jz
-from  material_properties import EM_properties, material_grid
+from  material_properties import Material, Material_grid
 import matplotlib.patches as patches
 
 Lx = 10 # Length in the x-direction in units m
@@ -35,11 +35,15 @@ Cu_left = 100
 Cu_right = 120
 
 
-material_list = [['Silicon', Si_left, Si_right, 'blue'], ['Copper', Cu_left, Cu_right, 'red']]
-materials = material_grid(material_list)
+Si = Material('Silicon')
+Cu = Material('Copper')
+New = Material(['new_mat', 3, 1, 0])
+
+material_list = [[Si, Si_left, Si_right, 'blue'], [Cu, Cu_left, Cu_right, 'red'], [New, 130, 140, 'yellow']]
+material_grid = Material_grid(material_list)
 
 
-[epsilon, mu, sigma] = materials.set_properties(epsilon, mu, sigma)
+[epsilon, mu, sigma] = material_grid.set_properties(epsilon, mu, sigma)
 
 # epsilon[60:90,:] = np.ones((30,N))*3*epsilon_0
 
@@ -147,14 +151,14 @@ ax.set_xlabel('Y')
 ax.set_ylabel('X')
 ax.set_aspect('equal', adjustable='box')
 for mat in material_list:
-    rect = patches.Rectangle((mat[1], 0), mat[2]-mat[1], N-1, edgecolor = mat[3], linewidth=1, facecolor="none", label = mat[0])
+    rect = patches.Rectangle((mat[1], 0), mat[2]-mat[1], N-1, edgecolor = mat[3], linewidth=1, facecolor="none", label = mat[0].name)
     ax.add_patch(rect)
 
 def animate(i):
     ax.pcolormesh(np.transpose(ez_list[:,:,int(i*animation_speed)]))
     ax.set_title(f'n = {int(i*animation_speed)}')
     for mat in material_list:
-        rect = patches.Rectangle((mat[1], 0), mat[2]-mat[1]-1, N-1, edgecolor = mat[3], linewidth=1, facecolor="none", label = mat[0])
+        rect = patches.Rectangle((mat[1], 0), mat[2]-mat[1]-1, N-1, edgecolor = mat[3], linewidth=1, facecolor="none", label = mat[0].name)
         ax.add_patch(rect)
 anim = FuncAnimation(fig, animate)
 plt.legend()
