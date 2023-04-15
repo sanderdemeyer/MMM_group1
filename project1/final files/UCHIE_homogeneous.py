@@ -10,8 +10,8 @@ from  material_properties import Material, Material_grid
 import matplotlib.patches as patches
 import pickle
 
-Lx = 10 # Length in the x-direction in units m
-Ly = 10 # Length in the y-direction in units m
+Lx = 100 # Length in the x-direction in units m
+Ly = 100 # Length in the y-direction in units m
 
 M = 200 # Number of cells in the x-direction
 N = 200 # Number of cells in the y-direction
@@ -36,14 +36,19 @@ Si = Material('Silicon')
 Cu = Material('Copper')
 SiO2 = Material('Silica')
 Mat3 = Material(['epsilon_r_3', 3, 1, 0])
+Lossy = Material(['lossy', 3, 1, 0.1])
 
-grid = 'MIS'
+grid = 'lossy'
 
-if grid == 'dielectric':
+if grid == 'vacuum':
+    material_list = []
+elif grid == 'dielectric':
     left = 100
     right = 140
 
     material_list = [[Mat3, left, right, 'blue']]
+elif grid == 'lossy':
+    material_list = [[Lossy, 100, 140, 'blue']]
 elif grid == 'MIS':
     Si_left = 100
     Si_right = 120
@@ -54,7 +59,8 @@ elif grid == 'MIS':
                      [SiO2, Si_right, SiO2_right, 'yellow'],
                      [Cu, SiO2_right, Cu_right, 'red']
                      ]
-
+else:
+    print('Invalid value of variable grid')
 
 material_grid = Material_grid(material_list)
 [epsilon, mu, sigma] = material_grid.set_properties(epsilon, mu, sigma)
@@ -78,7 +84,7 @@ delta_x_matrix = np.array([np.repeat(delta_x[i], N) for i in range(M)])
 delta_y_matrix = np.array([delta_y for i in range(M)])
 
 ### Definition of the courant number and the corresponding delta_t.
-courant_number = 3
+courant_number = 1
 delta_t = np.min(delta_y)/(c)*courant_number # in units s
 
 if simulation_time is not None:
@@ -154,16 +160,19 @@ def run_UCHIE():
         abs_eigenvalues = np.abs(Eigenvalues)
         print(f'maximal eigenvalue has magnitude {np.max(abs_eigenvalues)}')
         print(f'minimal eigenvalue has magnitude {np.min(abs_eigenvalues)}')
+        print(Eigenvalues)
         figure, axes = plt.subplots()
         Drawing_uncolored_circle = plt.Circle( (0, 0 ),
                                             1 ,
                                             fill = False )
         axes.add_artist( Drawing_uncolored_circle )
         axes.scatter(Eigenvalues.real,Eigenvalues.imag, s = 0.5, c = 'red')
+        plt.xlim(-1.5, 1.5)
+        plt.ylim(-1.5, 1.5)
         axes.set_aspect(1)
-        plt.xlabel(r'Re( $ \lambda $ )')
-        plt.ylabel(r'Im( $ \lambda $ )')
-        plt.title(r'Eigenvalues of the iteration matrix $ A_{inv} B $ ')
+        plt.xlabel(r'Re($ \lambda $)', fontsize = 10)
+        plt.ylabel(r'Im($ \lambda $)', fontsize = 10)
+        plt.title(r'Eigenvalues of $ A_{inv} B $ for the ' + grid + ' system')
         plt.show()
 
     for n in range(iterations):
