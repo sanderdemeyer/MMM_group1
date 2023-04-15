@@ -25,7 +25,7 @@ N_t = 200 # Number of cells in the y-direction of top region
 N_b = 200 # Number of cells in the y-direction of bottom region
 partition = 'uniform' # delta_x and delta_y are then constants. If partition != uniform, delta_x and delta_y should be specified as arrays.
 
-iterations = 750 # Number of iterations. The total time length that is simulated is then equal to iterations * delta_t
+iterations = 350 # Number of iterations. The total time length that is simulated is then equal to iterations * delta_t
 simulation_time = None # If set to None, the variable iterations is unaltered. 
 # If a value is given, this is the simulation time in units of c, thus making iterations equal to int(simulation_time*c/delta_t)
 
@@ -36,7 +36,7 @@ SiO2 = Material('Silica')
 Mat3 = Material(['epsilon_r_3', 3, 1, 0])
 Mat3p2 = Material(['epsilon_r_3.2', 3.2, 1, 0])
 
-grid = 'microstrip'
+grid = 'hole_in_wall'
 
 if grid == 'vacuum':
     material_list_b = []
@@ -79,6 +79,21 @@ elif grid == 'microstrip':
                        [Mat3p2, 89, 125, 'yellow'],
                        [Cu, 125, 134, 'red']
                         ]
+
+elif grid == 'hole_in_wall':
+    Lx = 1.2
+    Ly_t = 0.9
+    Ly_b = 0.3
+
+    M_t = 600
+    N_t = 450
+    N_b = 150
+
+    M_b_separate = [1 for i in range(M_t)] # For each top-cell, this denotes the number of UCHIE cells it is subdivided in in the bottom region.
+    M_b = sum(M_b_separate) # The total number of UCHIE cells in the x-direction of bottom region.
+
+    material_list_t = [[Cu, 250, 275, 'red']]
+    material_list_b = []
 
 
 ### Definitions of physical constants
@@ -161,8 +176,8 @@ jz_t = def_jz(J0, source, M_t, N_t, x_source, y_source, iterations, delta_t, tc,
 
 
 source = 'gaussian_modulated' # type of the source
-x_source = 60 # x-coordinate of the source. Make sure this is within bounds.
-y_source = 75//2 # y-coordinate of the source. Make sure this is within bounds.
+x_source = 225 # x-coordinate of the source. Make sure this is within bounds.
+y_source = 75 # y-coordinate of the source. Make sure this is within bounds.
 J0 = 1 # amplitude of the source in units V^2 m A^-1
 tc = 5 # tc*delta_t is the time the source peaks
 sigma_source = 2.2 # spread of the source in the case of gaussian or gaussian_modulated source
@@ -171,10 +186,13 @@ omega_c = (2*np.pi)/(period*delta_t) # angular frequency of the source in the ca
 
 jz_b = def_jz(J0, source, M_b, N_b, x_source, y_source, iterations, delta_t, tc, sigma_source, period, 1/(delta_x_b[x_source]*delta_y_b[y_source]))
 
-observation_points_ez_t = [(70, 100), (60, 350)]
+L = 200
+alpha_list = [2*i*(np.pi/180) for i in range(12, 38)]
+observation_points_ez_t = [(int(L*np.cos(alpha)), int(L*np.sin(alpha)-75)) for alpha in alpha_list]
+
 ez_t_list_observe = np.zeros((iterations, len(observation_points_ez_t)))
 
-observation_points_ez_b = [(70, 75//2)]
+observation_points_ez_b = [(240, 75)]
 ez_b_list_observe = np.zeros((iterations, len(observation_points_ez_b)))
 
 
@@ -226,9 +244,6 @@ for n in range(iterations):
     hy_b_old = hy_b_new
     bx_b_old = bx_b_new
 
-
-    bx = ...
-
     # Ez and Hy implicitly updated in the UCHIE region
     [ez_t_new, hy_t_new] = update_implicit_faster(ez_t_old, hy_t_old, bx_t_old, n, A_t_inv, A_invB_t, delta_t, delta_y_matrix_t, M_t, N_t, jz_t, mu_t)
     [ez_b_new, hy_b_new] = update_implicit_faster(ez_b_old, hy_b_old, bx_b_old, n, A_b_inv, A_invB_b, delta_t, delta_y_matrix_b, M_b, N_b, jz_b, mu_b)
@@ -238,7 +253,7 @@ for n in range(iterations):
     
     ez_b_new[:,0] = np.zeros(M_t)
     hy_b_new[:,0] = np.zeros(M_t)
-
+    
     # Bx explicitly updated in the top region (interpolation needed)
     bx_t_new = np.zeros((M_t, N_t))
     bx_t_new[:,1:-1] = bx_t_old[:,1:-1] - (ez_t_new[:,2:] - ez_t_new[:,1:-1])
@@ -261,8 +276,8 @@ for n in range(iterations):
     bx_b_new[:,0] = bx_b_old[:,0] - (ez_b_new[:,1] - np.dot(interpolate_matrix, ez_bottom)*delta_t) # add periodic boundary condition
 
     for i in range(M_t):
-        bx_t_new[i, 0] = bx_b_new[M_b_separate_cumsumlist[i],-1]/delta_y_b[-1]
-        bx_t_new[i, -1] = bx_b_new[M_b_separate_cumsumlist[i],0]/delta_y_b[0]
+        bx_t_new[i, 0] = bx_b_new[M_b_separate_cumsumlist[i],-1]
+        bx_t_new[i, -1] = bx_b_new[M_b_separate_cumsumlist[i],0]
 
     bx_t_list[:,:,n] = bx_t_new
     ez_t_list[:,:,n] = ez_t_new
@@ -278,13 +293,16 @@ for n in range(iterations):
     for i, point in enumerate(observation_points_ez_b):
         ez_b_list_observe[n, i] = ez_b_new[point]
 
-
+transmission_list = []
+transmission_base = []
 for i, point in enumerate(observation_points_ez_b):
     plt.plot(range(iterations), ez_b_list_observe[:,i])
     plt.xlabel('Iteration')
     plt.ylabel('Ez')
     plt.title(f'Ez at {point} in bottom UCHIE region')
     plt.show()
+
+    transmission_base.append(np.max(np.abs(ez_b_list_observe[:40,i])))
 
 for i, point in enumerate(observation_points_ez_t):
     plt.plot(range(iterations), ez_t_list_observe[:,i])
@@ -293,7 +311,12 @@ for i, point in enumerate(observation_points_ez_t):
     plt.title(f'Ez at {point} in top UCHIE region')
     plt.show()
 
-animation_speed = 15
+    transmission_list.append(np.max(np.abs(ez_t_list_observe[:,i])))
+
+print(transmission_base)
+print(transmission_list)
+
+animation_speed = 10
 
 fig, ax = plt.subplots()
 ax.set_xlabel('X')
@@ -333,3 +356,7 @@ def animate(i):
 anim = FuncAnimation(fig, animate)
 plt.legend()
 plt.show()
+
+
+with open('transmissions.pkl', 'wb') as f:
+    pickle.dump([transmission_list, transmission_list, alpha_list, observation_points_ez_t, observation_points_ez_b, ez_b_list_observe, ez_t_list_observe], f)

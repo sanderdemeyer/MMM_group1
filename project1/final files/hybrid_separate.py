@@ -28,7 +28,7 @@ SiO2 = Material('Silica')
 Mat3 = Material(['epsilon_r_3', 3, 1, 0])
 Mat3p2 = Material(['epsilon_r_3.2', 3.2, 1, 0])
 
-grid = 'microstrip'
+grid = 'hole_in_wall'
 if grid == 'microstrip':
     Lx = 324*10**(-6)
     Ly_Yee = 900*10**(-6)
@@ -69,8 +69,23 @@ elif grid == 'try_out':
 
     material_list_U = [[Si, Si_left, Si_right, 'blue'], [Cu, Cu_left, Cu_right, 'red']]
     material_grid_U = Material_grid(material_list_U)
+elif grid == 'hole_in_wall':
+    Lx = 1
+    Ly_Yee = 0.9
+    Ly_U = 0.1
 
+    M_Yee = 500
+    N_Yee = 450
+    N_U = 50
 
+    M_U_separate = [1 for i in range(M_Yee)] # For each top-cell, this denotes the number of UCHIE cells it is subdivided in in the bottom region.
+    M_U = sum(M_U_separate) # The total number of UCHIE cells in the x-direction of bottom region.
+
+    material_list_Yee = [[Cu, 250, 275, 'red']]
+    material_list_U = []
+    
+    material_grid_U = Material_grid(material_list_U)
+    material_grid_Yee = Material_grid(material_list_Yee)
 
 ### Definitions of physical constants
 epsilon_0 = 8.85*10**(-12)  # in units F/m
@@ -144,8 +159,8 @@ omega_c_Yee = (2*np.pi)/(period_Yee*delta_t) # angular frequency of the source i
 
 # UCHIE source
 source_U = 'gaussian_modulated' # type of the source
-source_X_U = 60 # x-coordinate of the source. Make sure this is within bounds.
-source_Y_U = 75//2 # y-coordinate of the source. Make sure this is within bounds.
+source_X_U = 225 # x-coordinate of the source. Make sure this is within bounds.
+source_Y_U = 25 # y-coordinate of the source. Make sure this is within bounds.
 J0_U = 1 # amplitude of the source in units V^2 m A^-1
 tc_U = 5 # tc*delta_t is the time the source peaks
 sigma_source_U = 2 # spread of the source in the case of gaussian or gaussian_modulated source
@@ -183,7 +198,7 @@ observation_point_U = ((70, 75//2))
 observation_points_ez_U = [] # [observation_point_U]
 ez_U_list_observe = np.zeros((iterations, len(observation_points_ez_U)))
 
-observation_point_Yee = ((70, 100))
+observation_point_Yee = ((70, 25))
 observation_points_ez_Yee = [observation_point_Yee]
 ez_Yee_list_observe = np.zeros((iterations, len(observation_points_ez_Yee)))
 
