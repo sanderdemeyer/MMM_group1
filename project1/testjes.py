@@ -2,10 +2,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.special as special
 import numpy.fft as fft
-
+import math
 import pickle
 
 print(isinstance(5, float))
+
+print(1/math.inf)
 
 
 with open('testje.pkl', 'rb') as f:

@@ -11,14 +11,16 @@ import matplotlib.patches as patches
 import pickle
 
 Lx = 10 # Length in the x-direction in units m
-Ly = 10 # Length in the x-direction in units m
+Ly = 10 # Length in the y-direction in units m
 
 M = 200 # Number of cells in the x-direction
 N = 200 # Number of cells in the y-direction
-partition = 'uniform' # delta_x and delta_y are then constants. If partition != uniform, these should be specified as arrays.
+partition = 'uniform' # delta_x and delta_y are then constants. If partition != uniform, delta_x and delta_y should be specified as arrays.
+
 
 iterations = 450 # Number of iterations. The total time length that is simulated is then equal to iterations * delta_t
-
+simulation_time = None # If set to None, the variable iterations is unaltered. 
+# If a value is given, this is the simulation time in units of c, thus making iterations equal to int(simulation_time*c/delta_t)
 
 ### Definitions of physical constants
 epsilon_0 = 8.85*10**(-12)  # in units F/m
@@ -76,8 +78,11 @@ delta_x_matrix = np.array([np.repeat(delta_x[i], N) for i in range(M)])
 delta_y_matrix = np.array([delta_y for i in range(M)])
 
 ### Definition of the courant number and the corresponding delta_t.
-courant_number = 1
+courant_number = 3
 delta_t = np.min(delta_y)/(c)*courant_number # in units s
+
+if simulation_time is not None:
+    iterations = int(simulation_time*c/delta_t)
 
 print(f'duration is {delta_t*iterations} seconds')
 
@@ -95,7 +100,8 @@ omega_c = (2*np.pi)/(period*delta_t) # angular frequency of the source in the ca
 jz = def_jz(J0, source, M, N, x_source, y_source, iterations, delta_t, tc, sigma_source, period, 1/(delta_x[x_source]*delta_y[y_source]))
 
 spectral_content = fft.fft(jz[x_source,y_source,:])[0]
-jz = jz/spectral_content
+print(f'spec cont is {spectral_content}')
+#jz = jz/spectral_content
 
 observation_points_ez = [(x_source + i, y_source) for i in range(M//2)] # observation points for the electric field
 
@@ -140,6 +146,25 @@ def run_UCHIE():
     # Definition of the UCHIE implicit update matrices.
     [A, B] = def_update_matrices(epsilon, mu, sigma, delta_x, delta_y, delta_t, M)
     A_inv = linalg.inv(A)
+
+    check_eigenvalues = True
+
+    if check_eigenvalues:
+        Eigenvalues = np.array(linalg.eigvals(np.dot(A_inv, B)))
+        abs_eigenvalues = np.abs(Eigenvalues)
+        print(f'maximal eigenvalue has magnitude {np.max(abs_eigenvalues)}')
+        print(f'minimal eigenvalue has magnitude {np.min(abs_eigenvalues)}')
+        figure, axes = plt.subplots()
+        Drawing_uncolored_circle = plt.Circle( (0, 0 ),
+                                            1 ,
+                                            fill = False )
+        axes.add_artist( Drawing_uncolored_circle )
+        axes.scatter(Eigenvalues.real,Eigenvalues.imag, s = 0.5, c = 'red')
+        axes.set_aspect(1)
+        plt.xlabel(r'Re( $ \lambda $ )')
+        plt.ylabel(r'Im( $ \lambda $ )')
+        plt.title(r'Eigenvalues of the iteration matrix $ A_{inv} B $ ')
+        plt.show()
 
     for n in range(iterations):
         print(f'iteration {n+1}/{iterations} started')
@@ -198,7 +223,7 @@ times = [i*delta_t for i in range(iterations)]
 for i, point in enumerate(observation_points_ez):
     plt.plot(times_Yee, ez_Yee_list_observe[:,i], label = 'Yee')
 
-    plt.plot(times, ez_list_observe[:,i]*4.47, label = 'UCHIE')
+    plt.plot(times, ez_list_observe[:,i]*4.87, label = 'UCHIE')
     plt.xlabel('Time [s]')
     plt.ylabel('Ez')
     plt.title(f'Ez at {point}')

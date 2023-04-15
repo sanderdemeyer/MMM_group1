@@ -4,8 +4,12 @@ class Material:
         self.mu_0 = 1.25663706*10**(-6)
         if isinstance(material, str):
             self.name = material
-            if material == 'Copper':
+            if material == 'PEC':
                 self.epsilon_r = 10**9 # should be infinite
+                self.mu_r = 1
+                self.sigma = 10**6
+            elif material == 'Copper':
+                self.epsilon_r = 1 # should be infinite
                 self.mu_r = 0.999994
                 self.sigma = 58*10**6
             elif material == 'Silicon':
@@ -36,6 +40,12 @@ class Material:
         sigma[left:right,:] = self.sigma
         return [epsilon, mu, sigma]
     
+    def set_properties_y_dependent(self, epsilon, mu, sigma, left, right, bottom, top):
+        epsilon[left:right,bottom:top] = self.eps_0*self.epsilon_r
+        mu[left:right,bottom:top] = self.mu_0*self.mu_r
+        sigma[left:right,bottom:top] = self.sigma
+        return [epsilon, mu, sigma]
+    
 class Material_grid:
     def __init__(self, material_list):
         # each element of material_list is [material, left, right, color]
@@ -49,4 +59,20 @@ class Material_grid:
     def set_properties(self, epsilon, mu, sigma):
         for el in self.material_list:
             [epsilon, mu, sigma] = el[0].set_properties(epsilon, mu, sigma, el[1], el[2])
+        return [epsilon, mu, sigma]
+
+class Material_grid_y_dependent:
+    def __init__(self, material_list):
+        # each element of material_list is [material, left, right, bottom, top, color]
+        # material should be an object of the class Material
+        # left and right are respectively the left and right edge of the block in the x-direction
+        # bottom and top are respectively the lower and upper edge of the block in the y-direction
+        # color is optional. If not given, this is set to red. Diversify for the animation.
+        for i, mat in enumerate(material_list):
+            if len(mat) == 5:
+                material_list[i].append('red')
+        self.material_list = material_list
+    def set_properties(self, epsilon, mu, sigma):
+        for el in self.material_list:
+            [epsilon, mu, sigma] = el[0].set_properties_y_dependent(epsilon, mu, sigma, el[1], el[2], el[3], el[4])
         return [epsilon, mu, sigma]

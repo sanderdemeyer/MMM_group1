@@ -9,7 +9,7 @@ import copy
 from functions import def_jz, def_update_matrices, def_update_matrices_hybrid, update_implicit, update_implicit_hybrid, def_update_matrices_hybrid_new, update_implicit_hybrid_new, update_implicit_hybrid_zeros
 import scipy.sparse.linalg as ssalg
 from scipy.sparse import csc_matrix
-from  material_properties import Material, Material_grid
+from  material_properties import Material, Material_grid, Material_grid_y_dependent
 import matplotlib.patches as patches
 import pickle
 
@@ -20,8 +20,51 @@ M_Yee = 200 # Number of cells in the x-direction of the Yee region
 N_Yee = 200 # Number of cells in the y-direction of the Yee region
 partition = 'uniform' # delta_x_Yee and delta_y_Yee are then constants. If partition != uniform, these should be specified as arrays.
 
-iterations = 450 # Number of iterations. The total time length that is simulated is then equal to iterations * delta_t
+iterations = 750 # Number of iterations. The total time length that is simulated is then equal to iterations * delta_t
 
+
+
+Si = Material('Silicon')
+Cu = Material('Copper')
+SiO2 = Material('Silica')
+Mat3 = Material(['epsilon_r_3', 3, 1, 0])
+Mat3p2 = Material(['epsilon_r_3.2', 3.2, 1, 0])
+
+grid = 'microstrip'
+
+if grid == 'block':
+    y_dependent = False
+
+    left = 100
+    right = 105
+
+    material_list_Yee = [[Cu, left, right, 'blue']]
+elif grid == 'MIS':
+    y_dependent = False
+
+    Si_left = 100
+    Si_right = 120
+    SiO2_right = 125
+    Cu_right = 130
+
+    material_list_Yee = [[Si, Si_left, Si_right, 'blue'], 
+                     [SiO2, Si_right, SiO2_right, 'yellow'],
+                     [Cu, SiO2_right, Cu_right, 'red']
+                     ]
+elif grid == 'microstrip':
+    # Microstrip based on figure 2.28 of the syllabus
+    y_dependent = True
+
+    Lx = 324*10**(-6)
+    Ly_Yee = 900*10**(-6)
+
+    M_Yee = 162
+    N_Yee = 525
+
+    material_list_Yee = [[Cu, 80, 89, 225, 300, 'red'],
+                    [Mat3p2, 89, 125, 0, N_Yee-1, 'yellow'],
+                    [Cu, 125, 134, 0, N_Yee-1, 'red'],
+                     ]
 
 ### Definitions of physical constants
 epsilon_0 = 8.85*10**(-12)  # in units F/m
@@ -33,35 +76,12 @@ epsilon_Yee = np.ones((M_Yee,N_Yee))*epsilon_0
 mu_Yee = np.ones((M_Yee,N_Yee))*mu_0
 sigma_Yee = np.ones((M_Yee,N_Yee))*0 # in units kg m^3 s^-3 A^-2 = V m^2 A^-1
 
-Si = Material('Silicon')
-Cu = Material('Copper')
-SiO2 = Material('Silica')
-Mat3 = Material(['epsilon_r_3', 3, 1, 0])
+if y_dependent:
+    material_grid_Yee = Material_grid_y_dependent(material_list_Yee)
+else:
+    material_grid_Yee = Material_grid(material_list_Yee)
 
-
-grid = 'MIS'
-
-
-if grid == 'dielectric':
-    left = 100
-    right = 140
-
-    material_list_Yee = [[Mat3, left, right, 'blue']]
-elif grid == 'MIS':
-    Si_left = 100
-    Si_right = 120
-    SiO2_right = 125
-    Cu_right = 130
-
-    material_list_Yee = [[Si, Si_left, Si_right, 'blue'], 
-                     [SiO2, Si_right, SiO2_right, 'yellow'],
-                     [Cu, SiO2_right, Cu_right, 'red']
-                     ]
-
-
-material_grid_Yee = Material_grid(material_list_Yee)
 [epsilon_Yee, mu_Yee, sigma_Yee] = material_grid_Yee.set_properties(epsilon_Yee, mu_Yee, sigma_Yee)
-
 
 if partition == 'uniform':
     delta_x_Yee = np.ones(M_Yee)*Lx/M_Yee
@@ -87,7 +107,7 @@ delta_t = (courant_number/c)*(1/(np.sqrt(1/(np.max(delta_x_Yee))**2 + 1/(np.max(
 # Yee source
 source_Yee = 'gaussian_modulated' # type of the source
 source_X_Yee = 60 # x-coordinate of the source. Make sure this is within bounds.
-source_Y_Yee = 100 # y-coordinate of the source. Make sure this is within bounds.
+source_Y_Yee = 525//2 # y-coordinate of the source. Make sure this is within bounds.
 J0_Yee = 1 # amplitude of the source in units V^2 m A^-1
 tc_Yee = 5 # tc*delta_t is the time the source peaks
 sigma_source_Yee = 2.2 # spread of the source in the case of gaussian or gaussian_modulated source
@@ -165,25 +185,44 @@ for i, point in enumerate(observation_points_ez_Yee):
     plt.title(f'Ez at {point}')
     plt.show()
 
-
-fig, ax = plt.subplots()
-ax.set_xlabel('X')
-ax.set_ylabel('Y')
-ax.set_aspect('equal', adjustable='box')
-for mat in material_list_Yee:
-    rect = patches.Rectangle((mat[1], 0), mat[2]-mat[1], N_Yee-1, edgecolor = mat[3], linewidth=1, facecolor="none", label = mat[0].name)
-    ax.add_patch(rect)
-
-def animate(i):
-    ax.pcolormesh(np.transpose(ez_Yee_list[:,:,int(i*animation_speed)]))
-    ax.set_title(f'n = {int(i*animation_speed)}')
+if y_dependent:
+    fig, ax = plt.subplots()
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_aspect('equal', adjustable='box')
     for mat in material_list_Yee:
-        rect = patches.Rectangle((mat[1], 0), mat[2]-mat[1]-1, N_Yee-1, edgecolor = mat[3], linewidth=1, facecolor="none", label = mat[0].name)
+        rect = patches.Rectangle((mat[1], mat[3]), mat[2]-mat[1], mat[4]-mat[3], edgecolor = mat[5], linewidth=1, facecolor="none", label = mat[0].name)
         ax.add_patch(rect)
 
-anim = FuncAnimation(fig, animate)
-plt.legend()
-plt.show()
+    def animate(i):
+        ax.pcolormesh(np.transpose(ez_Yee_list[:,:,int(i*animation_speed)]))
+        ax.set_title(f'n = {int(i*animation_speed)}')
+        for mat in material_list_Yee:
+            rect = patches.Rectangle((mat[1], mat[3]), mat[2]-mat[1], mat[4]-mat[3], edgecolor = mat[5], linewidth=1, facecolor="none", label = mat[0].name)
+            ax.add_patch(rect)
+
+    anim = FuncAnimation(fig, animate)
+    plt.legend()
+    plt.show()
+else:
+    fig, ax = plt.subplots()
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_aspect('equal', adjustable='box')
+    for mat in material_list_Yee:
+        rect = patches.Rectangle((mat[1], 0), mat[2]-mat[1], N_Yee-1, edgecolor = mat[3], linewidth=1, facecolor="none", label = mat[0].name)
+        ax.add_patch(rect)
+
+    def animate(i):
+        ax.pcolormesh(np.transpose(ez_Yee_list[:,:,int(i*animation_speed)]))
+        ax.set_title(f'n = {int(i*animation_speed)}')
+        for mat in material_list_Yee:
+            rect = patches.Rectangle((mat[1], 0), mat[2]-mat[1]-1, N_Yee-1, edgecolor = mat[3], linewidth=1, facecolor="none", label = mat[0].name)
+            ax.add_patch(rect)
+
+    anim = FuncAnimation(fig, animate)
+    plt.legend()
+    plt.show()
 
 times = [i*delta_t for i in range(iterations)]
 with open('Yee_epsr_3.pkl', 'wb') as f:

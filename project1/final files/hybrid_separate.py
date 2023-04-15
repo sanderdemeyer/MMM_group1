@@ -1,16 +1,12 @@
 import numpy as np
-import numpy.linalg as linalg
 import numpy.fft as fft
 import matplotlib.pyplot as plt
-import scipy.special as special
 from matplotlib.pyplot import pcolormesh
 from matplotlib.animation import FuncAnimation
-import copy
 from functions import def_jz, def_update_matrices, def_update_matrices_hybrid, update_implicit, update_implicit_hybrid, def_update_matrices_hybrid_new, update_implicit_hybrid_new, update_implicit_hybrid_zeros
-import scipy.sparse.linalg as ssalg
-from scipy.sparse import csc_matrix
 from  material_properties import Material, Material_grid
 import matplotlib.patches as patches
+from inversions import inversion
 
 Lx = 10 # Length in the x-direction in units m
 Ly_Yee = 10 # Length in the x-direction in units m
@@ -26,6 +22,55 @@ M_U = sum(M_U_separate) # The total number of UCHIE cells in the x-direction
 
 iterations = 750 # Number of iterations. The total time length that is simulated is then equal to iterations * delta_t
 
+Si = Material('Silicon')
+Cu = Material('Copper')
+SiO2 = Material('Silica')
+Mat3 = Material(['epsilon_r_3', 3, 1, 0])
+Mat3p2 = Material(['epsilon_r_3.2', 3.2, 1, 0])
+
+grid = 'microstrip'
+if grid == 'microstrip':
+    Lx = 324*10**(-6)
+    Ly_Yee = 900*10**(-6)
+    Ly_U = 150*10**(-6)
+
+    M_Yee = 162
+    N_Yee = 450
+    N_U = 75
+
+    M_U_separate = [1 for i in range(M_Yee)] # For each Yee-cell, this denotes the number of UCHIE cells it is subdivided in.
+    M_U = sum(M_U_separate) # The total number of UCHIE cells in the x-direction
+
+    material_list_U = [[Cu, 80, 89, 'red'],
+                       [Mat3p2, 89, 125, 'yellow'],
+                       [Cu, 125, 134, 'red']
+                        ]
+
+    material_list_Yee = [[Cu, 80, 89, 'red'],
+                       [Mat3p2, 89, 125, 'yellow'],
+                       [Cu, 125, 134, 'red']
+                        ]
+    material_grid_U = Material_grid(material_list_U)
+    material_grid_Yee = Material_grid(material_list_Yee)
+
+elif grid == 'try_out':
+    Si_left = 60
+    Si_right = 80
+    Cu_left = 100
+    Cu_right = 120
+
+    material_list_Yee = [[Si, Si_left, Si_right, 'blue'], [Cu, Cu_left, Cu_right, 'red']]
+    material_grid_Yee = Material_grid(material_list_Yee)
+
+    Si_left = 60
+    Si_right = 80
+    Cu_left = 100
+    Cu_right = 120
+
+    material_list_U = [[Si, Si_left, Si_right, 'blue'], [Cu, Cu_left, Cu_right, 'red']]
+    material_grid_U = Material_grid(material_list_U)
+
+
 
 ### Definitions of physical constants
 epsilon_0 = 8.85*10**(-12)  # in units F/m
@@ -40,30 +85,8 @@ sigma_Yee = np.ones((M_Yee,N_Yee))*0 # in units kg m^3 s^-3 A^-2 = V m^2 A^-1
 epsilon_U = np.ones((M_U,N_U))*epsilon_0
 mu_U = np.ones((M_U,N_U))*mu_0
 sigma_U = np.ones((M_U,N_U))*0 # in units kg m^3 s^-3 A^-2 = V m^2 A^-1
-
-
-Si = Material('Silicon')
-Cu = Material('Copper')
-
-
-
-Si_left = 60
-Si_right = 80
-Cu_left = 100
-Cu_right = 120
-
-material_list_Yee = [[Si, Si_left, Si_right, 'blue'], [Cu, Cu_left, Cu_right, 'red']]
-material_grid_Yee = Material_grid(material_list_Yee)
-
-Si_left = 60
-Si_right = 80
-Cu_left = 100
-Cu_right = 120
-
-material_list_U = [[Si, Si_left, Si_right, 'blue'], [Cu, Cu_left, Cu_right, 'red']]
-material_grid_U = Material_grid(material_list_U)
-
-
+    
+# Use the material grid defined above to set the matrices of epsilon, mu and sigma
 [epsilon_Yee, mu_Yee, sigma_Yee] = material_grid_Yee.set_properties(epsilon_Yee, mu_Yee, sigma_Yee)
 [epsilon_U, mu_U, sigma_U] = material_grid_U.set_properties(epsilon_U, mu_U, sigma_U)
 
@@ -113,7 +136,7 @@ delta_t = (courant_number/c)*min(np.max(delta_y_U), 1/(np.sqrt(1/(np.max(delta_x
 source_Yee = 'gaussian_modulated' # type of the source
 source_X_Yee = 50 # x-coordinate of the source. Make sure this is within bounds.
 source_Y_Yee = 100 # y-coordinate of the source. Make sure this is within bounds.
-J0_Yee = 1 # amplitude of the source in units V^2 m A^-1
+J0_Yee = 0 # amplitude of the source in units V^2 m A^-1
 tc_Yee = 5 # tc*delta_t is the time the source peaks
 sigma_source_Yee = 2.2 # spread of the source in the case of gaussian or gaussian_modulated source
 period_Yee = 10 # period of the source in number of time steps in the case of gaussian or gaussian_modulated source
@@ -121,9 +144,9 @@ omega_c_Yee = (2*np.pi)/(period_Yee*delta_t) # angular frequency of the source i
 
 # UCHIE source
 source_U = 'gaussian_modulated' # type of the source
-source_X_U = 45 # x-coordinate of the source. Make sure this is within bounds.
-source_Y_U = 25 # y-coordinate of the source. Make sure this is within bounds.
-J0_U = 0 # amplitude of the source in units V^2 m A^-1
+source_X_U = 60 # x-coordinate of the source. Make sure this is within bounds.
+source_Y_U = 75//2 # y-coordinate of the source. Make sure this is within bounds.
+J0_U = 1 # amplitude of the source in units V^2 m A^-1
 tc_U = 5 # tc*delta_t is the time the source peaks
 sigma_source_U = 2 # spread of the source in the case of gaussian or gaussian_modulated source
 period_U = 10 # period of the source in number of time steps in the case of gaussian or gaussian_modulated source
@@ -156,11 +179,11 @@ jz_Yee = def_jz(J0_Yee, source_Yee, M_Yee, N_Yee, source_X_Yee, source_Y_Yee, it
 ### Definition of the UCHIE implicit update matrices.
 [A, B] = def_update_matrices(epsilon_U, mu_U, sigma_U, delta_x_U, delta_y_U, delta_t, M_U)
 
-observation_point_U = ((75, 25))
+observation_point_U = ((70, 75//2))
 observation_points_ez_U = [] # [observation_point_U]
 ez_U_list_observe = np.zeros((iterations, len(observation_points_ez_U)))
 
-observation_point_Yee = ((75, 100))
+observation_point_Yee = ((70, 100))
 observation_points_ez_Yee = [observation_point_Yee]
 ez_Yee_list_observe = np.zeros((iterations, len(observation_points_ez_Yee)))
 
@@ -170,50 +193,7 @@ ez_Yee_list_observe = np.zeros((iterations, len(observation_points_ez_Yee)))
 inversion_method = 'numpy_nonsparse'
 
 # Taking the inverse
-if inversion_method == 'numpy_nonsparse':
-    A_inv = linalg.inv(A)
-elif inversion_method == 'numpy_sparse':
-    A_csc = csc_matrix(A)
-    A_inv_csc = ssalg.inv(A_csc)
-    A_inv = A_inv_csc.toarray()
-elif inversion_method == 'numpy_schur':
-    M11 = A[:M_U+1,:M_U+1]
-    M12 = A[:M_U+1,M_U+1:]
-    M21 = A[M_U+1:,:M_U+1]
-    M22 = A[M_U+1:,M_U+1:]
-    M22_inv = linalg.inv(M22)
-    S = M11 - np.dot(M12,np.dot(M22_inv,M21))
-    S_inv = linalg.inv(S)
-    A_inv = np.zeros((2*M_U,2*M_U))
-    Deel1 = S_inv
-    Deel2 =  -np.dot(S_inv,np.dot(M12,M22_inv))
-    Deel3 = -np.dot(M22_inv,np.dot(M21,S_inv))
-    Deel4 =  M22_inv + np.dot(M22_inv,np.dot(M21,np.dot(S_inv,np.dot(M12,M22_inv))))
-    A_inv[:M_U+1,:M_U+1] = Deel1
-    A_inv[:M_U+1,M_U+1:] = Deel2
-    A_inv[M_U+1:,:M_U+1] = Deel3
-    A_inv[M_U+1:,M_U+1:] = Deel4
-elif inversion_method == 'numpy_sparse_schur':
-    M11 = csc_matrix(A[:M_U+1,:M_U+1])
-    M12 = csc_matrix(A[:M_U+1,M_U+1:])
-    M21 = csc_matrix(A[M_U+1:,:M_U+1])
-    M22 = csc_matrix(A[M_U+1:,M_U+1:])
-    M22_inv = ssalg.inv(M22)
-    S = M11 - M12*M22_inv*M21
-    S_inv = ssalg.inv(S)
-    M_inv = np.zeros((2*M_U,2*M_U))
-    Deel1 = S_inv
-    Deel2 =  -S_inv*M12*M22_inv
-    Deel3 = -M22_inv*M21*S_inv
-    Deel4 =  M22_inv + M22_inv*M21*S_inv*M12*M22_inv
-    M_inv[:M_U+1,:M_U+1] = Deel1.toarray()
-    M_inv[:M_U+1,M_U+1:] = Deel2.toarray()
-    M_inv[M_U+1:,:M_U+1] = Deel3.toarray()
-    M_inv[M_U+1:,M_U+1:] = Deel4.toarray()
-    A_inv = M_inv
-else:
-    print('Invalid inversion method')
-
+A_inv = inversion(A, M_U, inversion_method)
 
 # initialization of the list of fields
 bx_Yee_list = np.zeros((M_Yee, N_Yee, iterations))
@@ -267,10 +247,12 @@ for n in range(iterations):
     ez_top = list(ez_Yee_new[:,1])
     ez_top.append(ez_Yee_new[0,1])
     ez_top = np.array(ez_top)
+    # bottom
     ez_bottom = list(ez_Yee_new[:,-1])
     ez_bottom.append(ez_Yee_new[0,-1])
     ez_bottom = np.array(ez_bottom)
 
+    # top
     bx_U_new[:,-1] = bx_U_old[:,-1] - (np.dot(interpolate_matrix, ez_top)*delta_t - ez_U_new[:,-1]) # add periodic boundary condition
     # ez_U[:,0] does not exist, or equivalently, is always zero.
     # bottom
