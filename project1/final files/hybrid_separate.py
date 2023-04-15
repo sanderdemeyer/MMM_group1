@@ -3,7 +3,7 @@ import numpy.fft as fft
 import matplotlib.pyplot as plt
 from matplotlib.pyplot import pcolormesh
 from matplotlib.animation import FuncAnimation
-from functions import def_jz, def_update_matrices, def_update_matrices_hybrid, update_implicit, update_implicit_hybrid, def_update_matrices_hybrid_new, update_implicit_hybrid_new, update_implicit_hybrid_zeros
+from functions import def_jz, def_update_matrices, update_implicit_faster
 from  material_properties import Material, Material_grid
 import matplotlib.patches as patches
 from inversions import inversion
@@ -194,6 +194,7 @@ inversion_method = 'numpy_nonsparse'
 
 # Taking the inverse
 A_inv = inversion(A, M_U, inversion_method)
+A_invB = np.dot(A_inv, B)
 
 # initialization of the list of fields
 bx_Yee_list = np.zeros((M_Yee, N_Yee, iterations))
@@ -233,8 +234,7 @@ for n in range(iterations):
     """
 
     # Ez and Hy implicitly updated in the UCHIE region
-#    [ez_U_new, hy_U_new] = update_implicit_hybrid_new(ez_U_old, hy_U_old, bx_U_old, n, A_inv, B, delta_t, delta_y_matrix_U, M_U, N_U, jz_U, mu_U, delta_x_Yee_left, delta_x_Yee_right, Ez_left_new, Ez_left_old, Ez_right_new, Ez_right_old, Hy_left, Hy_right)
-    [ez_U_new, hy_U_new] = update_implicit(ez_U_old, hy_U_old, bx_U_old, n, A_inv, B, delta_t, delta_y_matrix_U, M_U, N_U, jz_U, mu_U)
+    [ez_U_new, hy_U_new] = update_implicit_faster(ez_U_old, hy_U_old, bx_U_old, n, A_inv, A_invB, delta_t, delta_y_matrix_U, M_U, N_U, jz_U, mu_U)
 
     ez_U_new[:,0] = np.zeros(M_U)
     hy_U_new[:,0] = np.zeros(M_U)

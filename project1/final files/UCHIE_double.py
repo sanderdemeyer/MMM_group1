@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import scipy.special as special
 from matplotlib.pyplot import pcolormesh
 from matplotlib.animation import FuncAnimation
-from functions import def_update_matrices, update_implicit, def_jz
+from functions import def_update_matrices, update_implicit_faster, def_jz
 from  material_properties import Material, Material_grid
 import matplotlib.patches as patches
 import pickle
@@ -188,6 +188,9 @@ inversion_method = 'numpy_nonsparse'
 A_t_inv = inversion(A_t, M_t, inversion_method)
 A_b_inv = inversion(A_b, M_b, inversion_method)
 
+A_invB_t = np.dot(A_t_inv, B_t)
+A_invB_b = np.dot(A_b_inv, B_b)
+
 
 ### Definition of some matrices that are useful later on.
 eps_sigma_plus_t = epsilon_t/delta_t + sigma_t/2
@@ -227,8 +230,8 @@ for n in range(iterations):
     bx = ...
 
     # Ez and Hy implicitly updated in the UCHIE region
-    [ez_t_new, hy_t_new] = update_implicit(ez_t_old, hy_t_old, bx_t_old, n, A_t_inv, B_t, delta_t, delta_y_matrix_t, M_t, N_t, jz_t, mu_t)
-    [ez_b_new, hy_b_new] = update_implicit(ez_b_old, hy_b_old, bx_b_old, n, A_b_inv, B_b, delta_t, delta_y_matrix_b, M_b, N_b, jz_b, mu_b)
+    [ez_t_new, hy_t_new] = update_implicit_faster(ez_t_old, hy_t_old, bx_t_old, n, A_t_inv, A_invB_t, delta_t, delta_y_matrix_t, M_t, N_t, jz_t, mu_t)
+    [ez_b_new, hy_b_new] = update_implicit_faster(ez_b_old, hy_b_old, bx_b_old, n, A_b_inv, A_invB_b, delta_t, delta_y_matrix_b, M_b, N_b, jz_b, mu_b)
 
     ez_t_new[:,0] = np.zeros(M_t)
     hy_t_new[:,0] = np.zeros(M_t)

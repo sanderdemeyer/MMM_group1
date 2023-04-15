@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import scipy.special as special
 from matplotlib.pyplot import pcolormesh
 from matplotlib.animation import FuncAnimation
-from functions import def_update_matrices, update_implicit, def_jz
+from functions import def_update_matrices, update_implicit_faster, def_jz
 from  material_properties import Material, Material_grid
 import matplotlib.patches as patches
 import pickle
@@ -129,8 +129,8 @@ def def_explicit_update_matrix():
         E[b, b] = delta_x[i]/delta_t
     return E
 
-def step(ez_old, hy_old, bx_old, A_inv, B, n):
-    [ez_new, hy_new] = update_implicit(ez_old, hy_old, bx_old, n, A_inv, B, delta_t, delta_y_matrix, M, N, jz, mu)
+def step(ez_old, hy_old, bx_old, A_inv, A_invB, n):
+    [ez_new, hy_new] = update_implicit_faster(ez_old, hy_old, bx_old, n, A_inv, A_invB, delta_t, delta_y_matrix, M, N, jz, mu)
     bx_new = update_bx(bx_old, ez_new)
     return [ez_new, hy_new, bx_new]
 
@@ -152,6 +152,7 @@ def run_UCHIE():
     # Definition of the UCHIE implicit update matrices.
     [A, B] = def_update_matrices(epsilon, mu, sigma, delta_x, delta_y, delta_t, M)
     A_inv = linalg.inv(A)
+    A_invB = np.dot(A_inv, B)
 
     check_eigenvalues = True
 
@@ -177,7 +178,7 @@ def run_UCHIE():
 
     for n in range(iterations):
         print(f'iteration {n+1}/{iterations} started')
-        [ez, hy, bx] = step(ez, hy, bx, A_inv, B, n)
+        [ez, hy, bx] = step(ez, hy, bx, A_inv, A_invB, n)
         bx_list[:,:,n] = bx
         ez_list[:,:,n] = ez
         hy_list[:,:,n] = hy
