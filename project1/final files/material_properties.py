@@ -1,3 +1,12 @@
+### This file exists to be able to set materials in the mesh.
+### Some standard materials are defined, but a new material with any set of properties can be defined.
+
+### A new material can be defined by saying
+# new_mat = Material(name, eps_r, mu_r, sigma)
+
+### A material block can be added to the grid by specifying
+# material_list = [[material (e.g. new_mat), left_edge, right_edge, color of the visualisation]]
+
 class Material:
     def __init__(self, material):
         self.eps_0 = 8.85*10**(-12)
@@ -9,7 +18,7 @@ class Material:
                 self.mu_r = 1
                 self.sigma = 10**6
             elif material == 'Copper':
-                self.epsilon_r = 1 # should be infinite
+                self.epsilon_r = 1
                 self.mu_r = 0.999994
                 self.sigma = 58*10**6
             elif material == 'Silicon':

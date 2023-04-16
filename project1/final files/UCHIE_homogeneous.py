@@ -1,24 +1,24 @@
 import numpy as np
 import numpy.linalg as linalg
-import numpy.fft as fft
 import matplotlib.pyplot as plt
-import scipy.special as special
 from matplotlib.pyplot import pcolormesh
 from matplotlib.animation import FuncAnimation
 from functions import def_update_matrices, update_implicit_faster, def_jz
 from  material_properties import Material, Material_grid
 import matplotlib.patches as patches
-import pickle
 
-Lx = 100 # Length in the x-direction in units m
-Ly = 100 # Length in the y-direction in units m
+### File that implements the UCHIE-code. Relevant paramters to be changed are:
+### Lx, Ly, M, N, iterations, material_list (or grid), the source parameters, and the observation points.
+
+Lx = 5 # Length in the x-direction in units m
+Ly = 5 # Length in the y-direction in units m
 
 M = 200 # Number of cells in the x-direction
 N = 200 # Number of cells in the y-direction
 partition = 'uniform' # delta_x and delta_y are then constants. If partition != uniform, delta_x and delta_y should be specified as arrays.
 
 
-iterations = 450 # Number of iterations. The total time length that is simulated is then equal to iterations * delta_t
+iterations = 250 # Number of iterations. The total time length that is simulated is then equal to iterations * delta_t
 simulation_time = None # If set to None, the variable iterations is unaltered. 
 # If a value is given, this is the simulation time in units of c, thus making iterations equal to int(simulation_time*c/delta_t)
 
@@ -38,7 +38,7 @@ SiO2 = Material('Silica')
 Mat3 = Material(['epsilon_r_3', 3, 1, 0])
 Lossy = Material(['lossy', 3, 1, 0.1])
 
-grid = 'lossy'
+grid = 'vacuum'
 
 if grid == 'vacuum':
     material_list = []
@@ -88,14 +88,15 @@ courant_number = 1
 delta_t = np.min(delta_y)/(c)*courant_number # in units s
 
 if simulation_time is not None:
-    iterations = int(simulation_time*c/delta_t)
+    iterations = int(simulation_time/delta_t)
 
 print(f'duration is {delta_t*iterations} seconds')
 
 ### Definition of the source 
-# The source type should be either dirac, gaussian, gaussian_modulated, or gaussian_modulated_dirac
-source = 'gaussian_modulated' # type of the source
-x_source = 60 # x-coordinate of the source. Make sure this is within bounds.
+# The source type should be either dirac, gaussian, gaussian_modulated, or gaussian_modulated_dirac.
+# gaussian_modulated_dirac is a modulated gaussian in time, defined only on the point of the source. The source for other spatial points is zero.
+source = 'gaussian_modulated_dirac' # type of the source
+x_source = 100 # x-coordinate of the source. Make sure this is within bounds.
 y_source = 100 # y-coordinate of the source. Make sure this is within bounds.
 J0 = 1 # amplitude of the source in units V^2 m A^-1
 tc = 5 # tc*delta_t is the time the source peaks
@@ -105,11 +106,11 @@ omega_c = (2*np.pi)/(period*delta_t) # angular frequency of the source in the ca
 
 jz = def_jz(J0, source, M, N, x_source, y_source, iterations, delta_t, tc, sigma_source, period, 1/(delta_x[x_source]*delta_y[y_source]))
 
-spectral_content = fft.fft(jz[x_source,y_source,:])[0]
-print(f'spec cont is {spectral_content}')
+print('source defined')
+#spectral_content = fft.fft(jz[x_source,y_source,:])[0]
+#print(f'spec cont is {spectral_content}')
 #jz = jz/spectral_content
 
-observation_points_ez = [(x_source + i, y_source) for i in range(M//2)] # observation points for the electric field
 
 observation_point = ((80, 100))
 observation_points_ez = [observation_point]
@@ -150,11 +151,12 @@ def run_UCHIE():
     ez_list_observe = np.zeros((iterations, len(observation_points_ez)))
 
     # Definition of the UCHIE implicit update matrices.
+    print('started with things')
     [A, B] = def_update_matrices(epsilon, mu, sigma, delta_x, delta_y, delta_t, M)
     A_inv = linalg.inv(A)
     A_invB = np.dot(A_inv, B)
 
-    check_eigenvalues = True
+    check_eigenvalues = False
 
     if check_eigenvalues:
         Eigenvalues = np.array(linalg.eigvals(np.dot(A_inv, B)))
@@ -194,8 +196,8 @@ def run_UCHIE():
 animation_speed = 3
 
 fig, ax = plt.subplots()
-ax.set_xlabel('Y')
-ax.set_ylabel('X')
+ax.set_xlabel('X')
+ax.set_ylabel('Y')
 ax.set_aspect('equal', adjustable='box')
 for mat in material_list:
     rect = patches.Rectangle((mat[1], 0), mat[2]-mat[1], N-1, edgecolor = mat[3], linewidth=1, facecolor="none", label = mat[0].name)
@@ -210,33 +212,3 @@ def animate(i):
 anim = FuncAnimation(fig, animate)
 plt.legend()
 plt.show()
-
-def hankel(x, f, J0=1):
-    omega = 2*np.pi*f
-    return -(J0*omega*mu_0/4)*special.hankel2(0, (omega*x/c))
-
-frequency_point = 20
-
-fft_transform_r_values = [i*delta_x[0] for i in range(M//2)]
-fft_list = []
-
-
-
-#plt.plot(range(iterations), ez_list_observe[:,40])
-#plt.show()
-
-with open('Yee_epsr_3.pkl', 'rb') as f:
-    [ez_Yee_list_observe, iterations_Yee, times_Yee] = pickle.load(f)
-
-times = [i*delta_t for i in range(iterations)]
-
-for i, point in enumerate(observation_points_ez):
-    plt.plot(times_Yee, ez_Yee_list_observe[:,i], label = 'Yee')
-
-    plt.plot(times, ez_list_observe[:,i]*4.87, label = 'UCHIE')
-    plt.xlabel('Time [s]')
-    plt.ylabel('Ez')
-    plt.title(f'Ez at {point}')
-    plt.legend()
-    plt.show()
-

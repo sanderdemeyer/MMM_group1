@@ -1,26 +1,23 @@
 import numpy as np
-import numpy.linalg as linalg
-import numpy.fft as fft
 import matplotlib.pyplot as plt
-import scipy.special as special
 from matplotlib.pyplot import pcolormesh
 from matplotlib.animation import FuncAnimation
-import copy
-from functions import def_jz, def_update_matrices, def_update_matrices_hybrid, update_implicit, update_implicit_hybrid, def_update_matrices_hybrid_new, update_implicit_hybrid_new, update_implicit_hybrid_zeros
-import scipy.sparse.linalg as ssalg
-from scipy.sparse import csc_matrix
+from functions import def_jz
 from  material_properties import Material, Material_grid, Material_grid_y_dependent
 import matplotlib.patches as patches
-import pickle
 
-Lx = 10 # Length in the x-direction in units m
-Ly_Yee = 10 # Length in the x-direction in units m
+### File that implements the Yee-code. Relevant paramters to be changed are:
+### Lx, Ly_Yee, M_Yee, N_Yee, iterations, material_list_Yee (or grid), the source parameters, and the observation points.
+
+
+Lx = 5 # Length in the x-direction in units m
+Ly_Yee = 5 # Length in the x-direction in units m
 
 M_Yee = 200 # Number of cells in the x-direction of the Yee region
 N_Yee = 200 # Number of cells in the y-direction of the Yee region
 partition = 'uniform' # delta_x_Yee and delta_y_Yee are then constants. If partition != uniform, these should be specified as arrays.
 
-iterations = 750 # Number of iterations. The total time length that is simulated is then equal to iterations * delta_t
+iterations = 250 # Number of iterations. The total time length that is simulated is then equal to iterations * delta_t
 
 
 
@@ -30,9 +27,12 @@ SiO2 = Material('Silica')
 Mat3 = Material(['epsilon_r_3', 3, 1, 0])
 Mat3p2 = Material(['epsilon_r_3.2', 3.2, 1, 0])
 
-grid = 'microstrip'
+grid = 'vacuum'
 
-if grid == 'block':
+if grid == 'vacuum':
+    y_dependent = False
+    material_list_Yee = []
+elif grid == 'block':
     y_dependent = False
 
     left = 100
@@ -63,8 +63,18 @@ elif grid == 'microstrip':
 
     material_list_Yee = [[Cu, 80, 89, 225, 300, 'red'],
                     [Mat3p2, 89, 125, 0, N_Yee-1, 'yellow'],
-                    [Cu, 125, 134, 0, N_Yee-1, 'red'],
+                    [Cu, 125, 134, 0, N_Yee-1, 'red']
                      ]
+elif grid == 'hole_in_wall':
+    Lx = 1.2
+    Ly_Yee = 1.2
+    M_Yee = 600
+    N_Yee = 600
+
+    y_dependent = True
+    material_list_Yee = [[Cu, 250, 252, 0, 295, 'red'],
+                         [Cu, 250, 252, 305, 599, 'red']
+                         ]
 
 ### Definitions of physical constants
 epsilon_0 = 8.85*10**(-12)  # in units F/m
@@ -106,8 +116,8 @@ delta_t = (courant_number/c)*(1/(np.sqrt(1/(np.max(delta_x_Yee))**2 + 1/(np.max(
 
 # Yee source
 source_Yee = 'gaussian_modulated' # type of the source
-source_X_Yee = 60 # x-coordinate of the source. Make sure this is within bounds.
-source_Y_Yee = 525//2 # y-coordinate of the source. Make sure this is within bounds.
+source_X_Yee = 100 # x-coordinate of the source. Make sure this is within bounds.
+source_Y_Yee = 100 # y-coordinate of the source. Make sure this is within bounds.
 J0_Yee = 1 # amplitude of the source in units V^2 m A^-1
 tc_Yee = 5 # tc*delta_t is the time the source peaks
 sigma_source_Yee = 2.2 # spread of the source in the case of gaussian or gaussian_modulated source
@@ -132,10 +142,8 @@ bx_Yee_new = np.zeros((M_Yee, N_Yee))
 ### Value of the sources based on the definitions above.
 jz_Yee = def_jz(J0_Yee, source_Yee, M_Yee, N_Yee, source_X_Yee, source_Y_Yee, iterations, delta_t, tc_Yee, sigma_source_Yee, period_Yee, 1/(delta_x_Yee[0]*delta_y_Yee[0]))
 
-observation_point_Yee = ((80, 100))
-observation_points_ez_Yee = [observation_point_Yee]
+observation_points_ez_Yee = [(150, 100)]
 ez_Yee_list_observe = np.zeros((iterations, len(observation_points_ez_Yee)))
-
 
 # initialization of the list of fields
 bx_Yee_list = np.zeros((M_Yee, N_Yee, iterations))
@@ -176,8 +184,6 @@ for n in range(iterations):
     for i, point in enumerate(observation_points_ez_Yee):
         ez_Yee_list_observe[n, i] = ez_Yee_new[point]
 
-animation_speed = 5
-
 for i, point in enumerate(observation_points_ez_Yee):
     plt.plot(range(iterations), ez_Yee_list_observe[:,i])
     plt.xlabel('Iteration')
@@ -185,6 +191,8 @@ for i, point in enumerate(observation_points_ez_Yee):
     plt.title(f'Ez at {point}')
     plt.show()
 
+
+animation_speed = 5
 if y_dependent:
     fig, ax = plt.subplots()
     ax.set_xlabel('X')
@@ -223,7 +231,3 @@ else:
     anim = FuncAnimation(fig, animate)
     plt.legend()
     plt.show()
-
-times = [i*delta_t for i in range(iterations)]
-with open('Yee_epsr_3.pkl', 'wb') as f:
-    pickle.dump([ez_Yee_list_observe, iterations, times], f)

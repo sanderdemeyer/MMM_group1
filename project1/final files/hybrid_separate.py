@@ -1,5 +1,4 @@
 import numpy as np
-import numpy.fft as fft
 import matplotlib.pyplot as plt
 from matplotlib.pyplot import pcolormesh
 from matplotlib.animation import FuncAnimation
@@ -8,9 +7,13 @@ from  material_properties import Material, Material_grid
 import matplotlib.patches as patches
 from inversions import inversion
 
-Lx = 10 # Length in the x-direction in units m
-Ly_Yee = 10 # Length in the x-direction in units m
-Ly_U = 10
+### File that implements the UCHIE-Yee hybridisation. Relevant paramters to be changed are:
+### Lx, Ly_Yee, Ly_U, M_Yee, M_U, N_Yee, N_U, iterations, material_list_Yee, material_list_U (or grid), the source parameters, and the observation points.
+
+
+Lx = 5 # Length in the x-direction in units m
+Ly_Yee = 5 # Length in the x-direction in units m
+Ly_U = 5
 
 M_Yee = 200 # Number of cells in the x-direction of the Yee region
 N_Yee = 200 # Number of cells in the y-direction of the Yee region
@@ -20,7 +23,7 @@ partition = 'uniform' # delta_x_Yee and delta_y_Yee are then constants. If parti
 M_U_separate = [1 for i in range(M_Yee)] # For each Yee-cell, this denotes the number of UCHIE cells it is subdivided in.
 M_U = sum(M_U_separate) # The total number of UCHIE cells in the x-direction
 
-iterations = 750 # Number of iterations. The total time length that is simulated is then equal to iterations * delta_t
+iterations = 200 # Number of iterations. The total time length that is simulated is then equal to iterations * delta_t
 
 Si = Material('Silicon')
 Cu = Material('Copper')
@@ -28,8 +31,15 @@ SiO2 = Material('Silica')
 Mat3 = Material(['epsilon_r_3', 3, 1, 0])
 Mat3p2 = Material(['epsilon_r_3.2', 3.2, 1, 0])
 
-grid = 'hole_in_wall'
-if grid == 'microstrip':
+grid = 'vacuum'
+
+if grid == 'vacuum':
+    material_list_U = []
+    material_list_Yee = []
+
+    material_grid_U = Material_grid(material_list_U)
+    material_grid_Yee = Material_grid(material_list_Yee)
+elif grid == 'microstrip':
     Lx = 324*10**(-6)
     Ly_Yee = 900*10**(-6)
     Ly_U = 150*10**(-6)
@@ -70,18 +80,18 @@ elif grid == 'try_out':
     material_list_U = [[Si, Si_left, Si_right, 'blue'], [Cu, Cu_left, Cu_right, 'red']]
     material_grid_U = Material_grid(material_list_U)
 elif grid == 'hole_in_wall':
-    Lx = 1
-    Ly_Yee = 0.9
-    Ly_U = 0.1
+    Lx = 1.2
+    Ly_Yee = 1.18
+    Ly_U = 0.02
 
-    M_Yee = 500
-    N_Yee = 450
-    N_U = 50
+    M_Yee = 600
+    N_Yee = 590
+    N_U = 10
 
     M_U_separate = [1 for i in range(M_Yee)] # For each top-cell, this denotes the number of UCHIE cells it is subdivided in in the bottom region.
     M_U = sum(M_U_separate) # The total number of UCHIE cells in the x-direction of bottom region.
 
-    material_list_Yee = [[Cu, 250, 275, 'red']]
+    material_list_Yee = [[Cu, 250, 252, 'red']]
     material_list_U = []
     
     material_grid_U = Material_grid(material_list_U)
@@ -121,10 +131,7 @@ delta_y_matrix_Yee = np.array([delta_y_Yee for i in range(M_Yee)])
 
 # Corresponding delta_x and delta_y matrices for UCHIE part. This is completely determined by the previous settings.
 delta_x_U_fractions = np.array([[1/M_U_separate[i] for j in range(M_U_separate[i])] for i in range(M_Yee)])
-"""
-for i in range(N_Yee):
-    assert abs(sum(delta_x_U_fractions[i,:])-1) < 10**(-7), 'sum of all individual fractions should be 1 for each Yee-cell'
-"""
+
 delta_x_U_fractions_cumsumlist = np.array([np.cumsum(el) for el in delta_x_U_fractions])
 M_U_separate_cumsumlist = np.cumsum(M_U_separate)
 M_U_separate_cumsumlist = np.insert(M_U_separate_cumsumlist, 0, 0)
@@ -159,8 +166,8 @@ omega_c_Yee = (2*np.pi)/(period_Yee*delta_t) # angular frequency of the source i
 
 # UCHIE source
 source_U = 'gaussian_modulated' # type of the source
-source_X_U = 225 # x-coordinate of the source. Make sure this is within bounds.
-source_Y_U = 25 # y-coordinate of the source. Make sure this is within bounds.
+source_X_U = 50 # x-coordinate of the source. Make sure this is within bounds.
+source_Y_U = 50 # y-coordinate of the source. Make sure this is within bounds.
 J0_U = 1 # amplitude of the source in units V^2 m A^-1
 tc_U = 5 # tc*delta_t is the time the source peaks
 sigma_source_U = 2 # spread of the source in the case of gaussian or gaussian_modulated source
@@ -194,12 +201,12 @@ jz_Yee = def_jz(J0_Yee, source_Yee, M_Yee, N_Yee, source_X_Yee, source_Y_Yee, it
 ### Definition of the UCHIE implicit update matrices.
 [A, B] = def_update_matrices(epsilon_U, mu_U, sigma_U, delta_x_U, delta_y_U, delta_t, M_U)
 
-observation_point_U = ((70, 75//2))
-observation_points_ez_U = [] # [observation_point_U]
+observation_points_ez_U = [(100, 100)]
+
 ez_U_list_observe = np.zeros((iterations, len(observation_points_ez_U)))
 
-observation_point_Yee = ((70, 25))
-observation_points_ez_Yee = [observation_point_Yee]
+observation_points_ez_Yee = []
+
 ez_Yee_list_observe = np.zeros((iterations, len(observation_points_ez_Yee)))
 
 
@@ -241,12 +248,6 @@ for n in range(iterations):
 
     ez_Yee_new[:,0] = np.zeros(M_Yee)
 
-    """
-    # Change the edges of the Yee-region: equate the bx-values around the UCHIE box and the ez-values on the left and right side to the just updated UCHIE values.
-    ez_Yee_new[U_x_left+1:U_x_right-1,U_y_bottom+1:U_y_top-1] = np.zeros((M_Yee-2, N_U-2))
-    bx_Yee_old[U_x_left+1:U_x_right-1,U_y_bottom+1:U_y_top-1] = np.zeros((M_Yee-2, N_U-2))
-    hy_Yee_old[U_x_left+1:U_x_right-1,U_y_bottom+1:U_y_top-1] = np.zeros((M_Yee-2, N_U-2))
-    """
 
     # Ez and Hy implicitly updated in the UCHIE region
     [ez_U_new, hy_U_new] = update_implicit_faster(ez_U_old, hy_U_old, bx_U_old, n, A_inv, A_invB, delta_t, delta_y_matrix_U, M_U, N_U, jz_U, mu_U)
@@ -273,16 +274,6 @@ for n in range(iterations):
     # bottom
     bx_U_new[:,0] = bx_U_old[:,0] - (ez_U_new[:,1] - np.dot(interpolate_matrix, ez_bottom)*delta_t) # add periodic boundary condition
 
-
-
-    """ #Should be executed, but does not work yet.
-    # Change the edges of the Yee-region: equate the bx-values around the UCHIE box and the ez-values on the left and right side to the just updated UCHIE values.
-
-    bx_Yee_old[U_x_left,U_y_bottom:U_y_top] = bx_U_new[0,:]
-    bx_Yee_old[U_x_right,U_y_bottom:U_y_top] = bx_U_new[-1,:]
-    bx_Yee_old[U_x_right, U_y_bottom] = bx_U_new[M_U_separate_cumsumlist[-1]-1,0]
-    bx_Yee_old[U_x_right, U_y_top] = bx_U_new[M_U_separate_cumsumlist[-1]-1,-1]
-    """    
 
     # Bx is explicitly updated in the Yee region
     eq_3_term = np.divide(ez_Yee_new*delta_t, delta_y_matrix_Yee)
@@ -314,7 +305,7 @@ for n in range(iterations):
     for i, point in enumerate(observation_points_ez_Yee):
         ez_Yee_list_observe[n, i] = ez_Yee_new[point]
 
-animation_speed = 5
+animation_speed = 25
 
 for i, point in enumerate(observation_points_ez_U):
     plt.plot(range(iterations), ez_U_list_observe[:,i])
@@ -322,6 +313,7 @@ for i, point in enumerate(observation_points_ez_U):
     plt.ylabel('Ez in UCHIE region')
     plt.title(f'Ez at {point}')
     plt.show()
+
 
 for i, point in enumerate(observation_points_ez_Yee):
     plt.plot(range(iterations), ez_Yee_list_observe[:,i])
@@ -341,7 +333,7 @@ for mat in material_list_Yee:
 
 def animate(i):
     ax.pcolormesh(np.transpose(ez_Yee_list[:,:,int(i*animation_speed)]))
-    ax.set_title(f'n = {int(i*animation_speed)}')
+    ax.set_title(f'Yee region. n = {int(i*animation_speed)}')
     for mat in material_list_Yee:
         rect = patches.Rectangle((mat[1], 0), mat[2]-mat[1]-1, N_Yee-1, edgecolor = mat[3], linewidth=1, facecolor="none", label = mat[0].name)
         ax.add_patch(rect)
@@ -361,7 +353,7 @@ for mat in material_list_U:
 
 def animate(i):
     ax.pcolormesh(np.transpose(ez_U_list[:,:,int(i*animation_speed)]))
-    ax.set_title(f'n = {int(i*animation_speed)}')
+    ax.set_title(f'UCHIE region. n = {int(i*animation_speed)}')
     for mat in material_list_U:
         rect = patches.Rectangle((mat[1], 0), mat[2]-mat[1]-1, N_U-1, edgecolor = mat[3], linewidth=1, facecolor="none", label = mat[0].name)
         ax.add_patch(rect)

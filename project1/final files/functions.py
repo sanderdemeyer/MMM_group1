@@ -1,7 +1,9 @@
 import numpy as np
 from scipy.sparse import csr_matrix
+import math
 
 def def_jz(J0, source, M, N, x_point, y_point, iterations, delta_t, tc, sigma_source, period, delta_value):
+    # Definition of the source
     jz = np.zeros((M, N, iterations))
     if J0 == 0:
         return jz
@@ -11,22 +13,22 @@ def def_jz(J0, source, M, N, x_point, y_point, iterations, delta_t, tc, sigma_so
             jz[x_point, y_point, n] = J0*np.exp(-(n-tc)**2/(2*sigma_source**2))*np.sin(omega_c*n*delta_t)*delta_value
     elif source == 'gaussian_modulated':
         for n in range(iterations):
-            for i in range(M):
-                for j in range(N):
+            for i in range(max(0, x_point - math.ceil(5*sigma_source)), min(M, x_point + math.ceil(5*sigma_source) + 1)):
+                for j in range(max(0, y_point - math.ceil(5*sigma_source)), min(N, y_point + math.ceil(5*sigma_source) + 1)):
                     jz[i, j, n] = J0*np.exp(-(n-tc)**2/(2*sigma_source**2))*np.exp(-((i-x_point)**2 + (j-y_point)**2)/(2*sigma_source**2))
     elif source == 'gaussian':
         delta_t = delta_value
         omega_c = (2*np.pi)/(period*delta_t) # to have a period of 10 time steps
         for n in range(iterations):
-            for i in range(M):
-                for j in range(N):
+            for i in range(x_point - math.ceil(5*sigma_source), x_point + math.ceil(5*sigma_source) + 1):
+                for j in range(y_point - math.ceil(5*sigma_source), y_point + math.ceil(5*sigma_source) + 1):
                     jz[i, j, n] = J0*np.exp(-(n-tc)**2/(2*sigma_source**2))*np.sin(omega_c*n*delta_t)*np.exp(-((i-x_point)**2 + (j-y_point)**2)/(2*sigma_source**2))
     elif source == 'sine':
         delta_t = delta_value
         omega_c = (2*np.pi)/(period*delta_t) # to have a period of 10 time steps
         for n in range(iterations):
-            for i in range(M):
-                for j in range(N):
+            for i in range(x_point - math.ceil(5*sigma_source), x_point + math.ceil(5*sigma_source) + 1):
+                for j in range(y_point - math.ceil(5*sigma_source), y_point + math.ceil(5*sigma_source) + 1):
                     jz[i, j, n] = J0*np.sin(omega_c*n*delta_t)*np.exp(-(i**2 + j**2)/(2*sigma_source**2))
     elif source == 'dirac':
         jz[x_point, y_point, 0] = delta_value
@@ -36,6 +38,8 @@ def def_jz(J0, source, M, N, x_point, y_point, iterations, delta_t, tc, sigma_so
 
 
 def def_update_matrices(epsilon, mu, sigma, delta_x, delta_y, delta_t, M):
+    # definition of the UCHIE update matrices.
+    # PBC are implemented
     A = np.zeros((2*M, 2*M))
     B = np.zeros((2*M, 2*M))
 
@@ -89,6 +93,7 @@ def def_update_matrices(epsilon, mu, sigma, delta_x, delta_y, delta_t, M):
 
 
 def update_implicit(ez_old, hy_old, bx, n, A_inv, B, delta_t, delta_y_matrix, M, N, jz, mu):
+    # code to implicitly update ez and hy in the UCHIE regions
 
     bx_term = -(delta_t/2)*np.divide(bx, np.multiply(mu, delta_y_matrix))
     C_term_base = np.roll(bx_term, -1, 0) + bx_term - np.roll(np.roll(bx_term, -1, 0), 1, 1) - np.roll(bx_term, 1, 1)
@@ -105,6 +110,8 @@ def update_implicit(ez_old, hy_old, bx, n, A_inv, B, delta_t, delta_y_matrix, M,
     return [new_values[:M,:], new_values[M:,:]]
 
 def update_implicit_faster(ez_old, hy_old, bx, n, A_inv, A_invB, delta_t, delta_y_matrix, M, N, jz, mu):
+    # code to implicitly update ez and hy in the UCHIE regions
+    # this works marginally faster than update_implicit, as the matrix A^{-1} B is precomputed.
 
     bx_term = -(delta_t/2)*np.divide(bx, np.multiply(mu, delta_y_matrix))
     C_term_base = np.roll(bx_term, -1, 0) + bx_term - np.roll(np.roll(bx_term, -1, 0), 1, 1) - np.roll(bx_term, 1, 1)
@@ -121,9 +128,8 @@ def update_implicit_faster(ez_old, hy_old, bx, n, A_inv, A_invB, delta_t, delta_
     return [new_values[:M,:], new_values[M:,:]]
 
 
+### The underlying code can be ignored, as they correspond to outdated functions.
 """
-
-
 def update_implicit_hybrid_OLD(ez_old, hy_old, bx, n, A_inv, B, delta_t, delta_y_matrix, M, N, jz, mu, delta_x_Yee_left, delta_x_Yee_right, Hy_Yee_left, Hy_Yee_right, Ez_Yee_left, Ez_Yee_right):
 
     bx_term = -(delta_t/2)*np.divide(bx, np.multiply(mu, delta_y_matrix))

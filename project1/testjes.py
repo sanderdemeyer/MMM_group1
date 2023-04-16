@@ -5,6 +5,32 @@ import numpy.fft as fft
 import math
 import pickle
 
+L = 100
+alpha_list = [5*i*(np.pi/180) for i in range(2, 18)]
+
+lijst = [0.2622198554373002, 0.27511535683450566, 0.2722865053740776, 0.26964801686453976, 0.29664049150999644, 0.30524463996685974, 0.3008733521232018, 0.2853102131688205, 0.26479734517672865, 0.23849545196360195, 0.1995767754287766, 0.1526444045747893, 0.10921250006607525, 0.07140795964807184, 0.04358507823095454, 0.020177605395429923]
+
+with open('transmissions_newest_small_hole_Yee.pkl', 'rb') as f:
+ #   [transmission_list, transmission_list, alpha_list, observation_points_ez_t, observation_points_ez_b, ez_b_list_observe, ez_t_list_observe] = pickle.load(f)
+    [alpha_list_Yee, transmission_list_new_Yee, transmission_base_Yee] = pickle.load(f)
+
+alpha_list_Yee = [5*i*(np.pi/180) for i in range(2, 18)]
+
+transmission_list_new_Yee = [5568535212.201709, 5002776854.748446, 5148949470.336315, 5076747786.9934225, 4858345547.975754, 5044902122.941957, 5022828191.227059, 4850123066.922238, 4505440668.75744, 4014453372.0794606, 3336431705.702389, 2684189897.3017864, 2046614301.505118, 1422420720.5876079, 949425700.115568, 463220085.5807024]
+
+a = transmission_list_new_Yee[6]/lijst[6]
+
+plt.plot(np.array(alpha_list)*180/np.pi, lijst, label = 'Yee')
+plt.plot(np.array(alpha_list_Yee)*180/np.pi, np.array(transmission_list_new_Yee)/a, label = 'UCHIE-Yee hybrid')
+plt.ylabel('Relative peak of the wave')
+plt.xlabel(r'$ \alpha $ [degrees]')
+plt.title('Transmission through small hole in PEC')
+plt.legend()
+plt.show()
+
+
+
+
 print(isinstance(5, float))
 
 print(1/math.inf)
@@ -16,7 +42,7 @@ print(M_U)
 print(A)
 
 
-
+print(math.ceil(5.5))
 
 print(a)
 

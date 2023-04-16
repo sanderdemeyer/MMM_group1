@@ -1,17 +1,15 @@
 import numpy as np
-import numpy.linalg as linalg
-import numpy.fft as fft
 import matplotlib.pyplot as plt
-import scipy.special as special
 from matplotlib.pyplot import pcolormesh
 from matplotlib.animation import FuncAnimation
 from functions import def_update_matrices, update_implicit_faster, def_jz
 from  material_properties import Material, Material_grid
 import matplotlib.patches as patches
-import pickle
 from inversions import inversion
 
 ### This file serves to be able to stack 2 UCHIE regions, both themselves homogeneous in the y-direction, on top of each other in the y-direction.
+### Relevant paramters to be changed are:
+### Lx, Ly_t, Ly_b, M_t, M_b, iterations, material_list_t, material_list_b (or grid), the source parameters, and the observation points.
 
 Lx = 10 # Length in the x-direction in units m
 Ly_t = 10 # Length of the top region in the y-direction in units m
@@ -25,7 +23,7 @@ N_t = 200 # Number of cells in the y-direction of top region
 N_b = 200 # Number of cells in the y-direction of bottom region
 partition = 'uniform' # delta_x and delta_y are then constants. If partition != uniform, delta_x and delta_y should be specified as arrays.
 
-iterations = 350 # Number of iterations. The total time length that is simulated is then equal to iterations * delta_t
+iterations = 250 # Number of iterations. The total time length that is simulated is then equal to iterations * delta_t
 simulation_time = None # If set to None, the variable iterations is unaltered. 
 # If a value is given, this is the simulation time in units of c, thus making iterations equal to int(simulation_time*c/delta_t)
 
@@ -36,7 +34,7 @@ SiO2 = Material('Silica')
 Mat3 = Material(['epsilon_r_3', 3, 1, 0])
 Mat3p2 = Material(['epsilon_r_3.2', 3.2, 1, 0])
 
-grid = 'hole_in_wall'
+grid = 'vacuum'
 
 if grid == 'vacuum':
     material_list_b = []
@@ -82,17 +80,17 @@ elif grid == 'microstrip':
 
 elif grid == 'hole_in_wall':
     Lx = 1.2
-    Ly_t = 0.9
-    Ly_b = 0.3
+    Ly_t = 1.18
+    Ly_b = 0.02
 
     M_t = 600
-    N_t = 450
-    N_b = 150
+    N_t = 590
+    N_b = 10
 
     M_b_separate = [1 for i in range(M_t)] # For each top-cell, this denotes the number of UCHIE cells it is subdivided in in the bottom region.
     M_b = sum(M_b_separate) # The total number of UCHIE cells in the x-direction of bottom region.
 
-    material_list_t = [[Cu, 250, 275, 'red']]
+    material_list_t = [[Cu, 250, 252, 'red']]
     material_list_b = []
 
 
@@ -176,8 +174,8 @@ jz_t = def_jz(J0, source, M_t, N_t, x_source, y_source, iterations, delta_t, tc,
 
 
 source = 'gaussian_modulated' # type of the source
-x_source = 225 # x-coordinate of the source. Make sure this is within bounds.
-y_source = 75 # y-coordinate of the source. Make sure this is within bounds.
+x_source = 100 # x-coordinate of the source. Make sure this is within bounds.
+y_source = 100 # y-coordinate of the source. Make sure this is within bounds.
 J0 = 1 # amplitude of the source in units V^2 m A^-1
 tc = 5 # tc*delta_t is the time the source peaks
 sigma_source = 2.2 # spread of the source in the case of gaussian or gaussian_modulated source
@@ -186,13 +184,10 @@ omega_c = (2*np.pi)/(period*delta_t) # angular frequency of the source in the ca
 
 jz_b = def_jz(J0, source, M_b, N_b, x_source, y_source, iterations, delta_t, tc, sigma_source, period, 1/(delta_x_b[x_source]*delta_y_b[y_source]))
 
-L = 200
-alpha_list = [2*i*(np.pi/180) for i in range(12, 38)]
-observation_points_ez_t = [(int(L*np.cos(alpha)), int(L*np.sin(alpha)-75)) for alpha in alpha_list]
-
+observation_points_ez_t = [(100, 100)]
 ez_t_list_observe = np.zeros((iterations, len(observation_points_ez_t)))
 
-observation_points_ez_b = [(240, 75)]
+observation_points_ez_b = [(100, 100)]
 ez_b_list_observe = np.zeros((iterations, len(observation_points_ez_b)))
 
 
@@ -293,16 +288,12 @@ for n in range(iterations):
     for i, point in enumerate(observation_points_ez_b):
         ez_b_list_observe[n, i] = ez_b_new[point]
 
-transmission_list = []
-transmission_base = []
 for i, point in enumerate(observation_points_ez_b):
     plt.plot(range(iterations), ez_b_list_observe[:,i])
     plt.xlabel('Iteration')
     plt.ylabel('Ez')
     plt.title(f'Ez at {point} in bottom UCHIE region')
     plt.show()
-
-    transmission_base.append(np.max(np.abs(ez_b_list_observe[:40,i])))
 
 for i, point in enumerate(observation_points_ez_t):
     plt.plot(range(iterations), ez_t_list_observe[:,i])
@@ -311,10 +302,6 @@ for i, point in enumerate(observation_points_ez_t):
     plt.title(f'Ez at {point} in top UCHIE region')
     plt.show()
 
-    transmission_list.append(np.max(np.abs(ez_t_list_observe[:,i])))
-
-print(transmission_base)
-print(transmission_list)
 
 animation_speed = 10
 
@@ -328,7 +315,7 @@ for mat in material_list_b:
 
 def animate(i):
     ax.pcolormesh(np.transpose(ez_b_list[:,:,int(i*animation_speed)]))
-    ax.set_title(f'n = {int(i*animation_speed)}')
+    ax.set_title(f'bottom UCHIE region. n = {int(i*animation_speed)}')
     for mat in material_list_b:
         rect = patches.Rectangle((mat[1], 0), mat[2]-mat[1]-1, N_b-1, edgecolor = mat[3], linewidth=1, facecolor="none", label = mat[0].name)
         ax.add_patch(rect)
@@ -348,7 +335,7 @@ for mat in material_list_t:
 
 def animate(i):
     ax.pcolormesh(np.transpose(ez_t_list[:,:,int(i*animation_speed)]))
-    ax.set_title(f'n = {int(i*animation_speed)}')
+    ax.set_title(f'top UCHIE region. n = {int(i*animation_speed)}')
     for mat in material_list_t:
         rect = patches.Rectangle((mat[1], 0), mat[2]-mat[1]-1, N_t-1, edgecolor = mat[3], linewidth=1, facecolor="none", label = mat[0].name)
         ax.add_patch(rect)
@@ -356,7 +343,3 @@ def animate(i):
 anim = FuncAnimation(fig, animate)
 plt.legend()
 plt.show()
-
-
-with open('transmissions.pkl', 'wb') as f:
-    pickle.dump([transmission_list, transmission_list, alpha_list, observation_points_ez_t, observation_points_ez_b, ez_b_list_observe, ez_t_list_observe], f)

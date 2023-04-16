@@ -3,6 +3,9 @@ import numpy.linalg as linalg
 from scipy.sparse import csc_matrix
 import scipy.sparse.linalg as ssalg
 
+### Code file to compute the inverse of matrix A
+### This file exists to compare different methods in terms of speed.
+
 def inversion(A, M_U, inversion_method):
     if inversion_method == 'numpy_nonsparse':
         A_inv = linalg.inv(A)
