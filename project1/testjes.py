@@ -5,6 +5,16 @@ import numpy.fft as fft
 import math
 import pickle
 
+
+print('fdq'*5)
+
+tot = 100
+for i in range(tot):
+    print(f'iteration {i}/{tot}. [{"#"*int(i/tot*10)}{" "*(10-int(i/tot*10))}]: {i/tot*100}%')
+
+
+print(a)
+
 L = 100
 alpha_list = [5*i*(np.pi/180) for i in range(2, 18)]
 

@@ -19,7 +19,7 @@ omega_EM = alpha*omega_HO
 delta_x = 1.0*10**(-6)
 delta_y = 0.5*10**(-9)
 n_y = int(L_y/delta_y)
-t_sim = 5*10**(-12)
+t_sim = 5*10**(-14)
 #provide location of structure through boundary of y-domain
 y_start = 0
 Courant = 1
@@ -74,7 +74,9 @@ def ABC():
 def run():
     for i in range(n_t):
         Update_real(i)
-        print('Done iteration %d'%(i))
+        #print(f'Done iteration {i}/{n_t}. This is {i/n_t*100}%')
+        print(f'iteration {i}/{n_t}. [{"#"*int(i/n_t*50)}{" "*(50-int(i/n_t*50))}]: {i/n_t*100}%')
+
     return psi_r,psi_im
 
 
