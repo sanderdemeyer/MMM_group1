@@ -10,8 +10,10 @@ hbar = constants.hbar
 m = 0.15*constants.m_e 
 c = constants.c
 q = -constants.e
+mu = constants.mu_0
+epsilon = constants.epsilon_0
 
-L_x = 0.5*10**(-9) # Length in the x-direction in meter
+L_x = 1*10**(-4) # Length in the x-direction in meter
 L_y = 100*10**(-9) # Length in the y-direction in meter
 N = 9*10**(27)
 omega_HO = 10*10**(12) # frequency of the HO
@@ -21,9 +23,10 @@ sigma_t = 10*10**(-15) # Width of the gaussian pulse
 t0 = 20*10**(-15) # Center of the gaussian pulse
 alpha = 0.9 #should be between 0.9 and 1.1
 omega_EM = alpha*omega_HO
-delta_x = 1.0*10**(-6) # grid size in the x-direction in meter
+delta_x = 1*10**(-6) # grid size in the x-direction in meter
 delta_y = 0.5*10**(-9) # grid size in the y-direction in meter
 n_y = int(L_y/delta_y) + 1 # Number of y grid cells
+n_x = int(L_x/delta_x) + 1 # Number of y grid cells
 t_sim = 1*10**(-12) # Total simulated time in seconds
 #provide location of structure through boundary of y-domain
 y_start = -L_y/2
@@ -31,10 +34,15 @@ Courant = 1 # Courant number
 delta_t = 1/c*Courant*delta_y # time step based on the Courant number
 n_t = int(t_sim/delta_t) # Total number of time steps
 y_axis = np.linspace(y_start,y_start + (n_y-1)*delta_y,n_y)
+x_axis = np.linspace(0, (n_x-1)*delta_x,n_x)
 #initialize both real and imaginary parts of the wave function psi. In case alpha is not real, the initialization needs to be adapted.
 alpha_y = 0
 
-coupling = False
+x_place_qd = L_x/4 # place of the quantum dot
+x_qd = int(x_place_qd/delta_x) # y-coordinate of the quantum dot
+
+
+coupling = True
 
 def update_matrix():
     A = np.zeros((n_y,n_y))
@@ -83,6 +91,19 @@ def harmonic_potential_and_length():
     H_int.eliminate_zeros()
     return V,H_int
 
+def get_H_int(a):
+    H_int = np.zeros((n_y,n_y))
+    for i in range(n_y):
+        y = y_start + i*delta_y
+        H_int[i,i] = q**2/(2*m)*a**2
+        H_int[i,i+1] = 0
+    H_int = csr_matrix(H_int)
+    H_int.eliminate_zeros()
+    return H_int
+
+
+
+
 def ABC():
     print('to do')
 
@@ -92,6 +113,9 @@ def run(coupling):
     psi_im = np.zeros((n_y,n_t))
     Norm = np.zeros(n_t)
 
+    ey = np.zeros((n_x, n_t))
+    hz = np.zeros((n_x, n_t))
+
     A = update_matrix()
     V,H_int = harmonic_potential_and_length()
 
@@ -100,6 +124,10 @@ def run(coupling):
     psi_r[:,0] = psi_r_old
     psi_im_old = np.zeros(n_y)
     Norm[0] = (np.sum(psi_r_old**2) + np.sum(psi_im_old**2))*delta_y
+
+    ey_old = np.zeros(n_x)
+    hz_old = np.zeros(n_x)
+
     """
     for i in range(n_y):
         y = y_start + delta_y*i
@@ -108,24 +136,45 @@ def run(coupling):
     """
 
     for i in range(1,n_t):
+        hz_new = hz_old - delta_t/(mu*delta_x)*(np.roll(ey_old, -1) - ey_old)
+
         if coupling == False:
             psi_r_new = psi_r_old - hbar*delta_t*(A @ psi_im_old)/(24*m*(delta_y**2)) + delta_t*(V @ psi_im_old)/hbar
             psi_im_new = psi_im_old + hbar*delta_t/24/(m*delta_y**2)*(A @ psi_r_new) - delta_t/hbar*(V @ psi_r_new)
         else:
-            H_int = H_int*Exciting_PW('Gaussian_pulse',i)
-            psi_r_new = psi_r_old - hbar*delta_t/24/(m*delta_y**2)*(A*psi_im_old) + delta_t/hbar*(V*psi_im_old + H_int*psi_im_old)
-            psi_im_new = psi_im_old + hbar*delta_t/24/(m*delta_y**2)*(A*psi_r_new) - delta_t/hbar*(V*psi_r_new + H_int*psi_r_new)
+            a = Exciting_PW('Gaussian_pulse',i)
+
+            #psi_r_new = psi_r_old - hbar*delta_t/24/(m*delta_y**2)*(A @ psi_im_old) + delta_t/hbar*((V + H_int) @ psi_im_old)
+            #psi_im_new = psi_im_old + hbar*delta_t/24/(m*delta_y**2)*(A @ psi_r_new) - delta_t/hbar*((V + H_int) @ psi_r_new)
+            psi_r_new = psi_r_old - hbar*delta_t/24/(m*delta_y**2)*(A @ psi_im_old) + delta_t/hbar*(V @ psi_im_old - q*y_axis*ey_old[x_qd]*psi_im_old)
+            psi_im_new = psi_im_old + hbar*delta_t/24/(m*delta_y**2)*(A @ psi_r_new) - delta_t/hbar*(V @ psi_r_new - q*y_axis*ey_old[x_qd]*psi_im_old)
        
+        sigma = 25
+        Jy = np.zeros(n_x)
+        J0 = 10**10
+        Jy[3*n_x//4] = J0*np.exp(-(i-400)**2/(2*sigma**2))
+        ey_new = ey_old - delta_t/(epsilon*delta_x) * (hz_old - np.roll(hz_old, 1)) - (delta_t/epsilon)*Jy
+        #ey_new = ey_old - delta_t/(epsilon*delta_x) * (np.roll(hz_old, -1) - hz_old) - (delta_t/epsilon)*Jy
+        
+        S = c*delta_t/delta_x
+        ey_new[0] = ey_old[1] + (1-S)/(1+S)*(ey_old[0]-ey_new[1])
+        ey_new[-1] = ey_old[-2] + (1-S)/(1+S)*(ey_old[-1]-ey_new[-2])
+
         psi_r[:,i] = psi_r_new
         psi_im[:,i] = psi_im_new 
         psi_r_old = psi_r_new
         psi_im_old = psi_im_new
 
+        ey[:,i] = ey_new
+        hz[:,i] = hz_new
+        ey_old = ey_new
+        hz_old = hz_new
+
         Norm[i] = (np.sum(psi_r_old**2) + np.sum(psi_im_old**2))*delta_y
 
         if i%1000 == 0:
             print(f'Done iteration {i} of {n_t}')
-    return psi_r,psi_im, Norm
+    return psi_r,psi_im, Norm, ey, hz
 
 def f(t):
     '''
@@ -141,7 +190,7 @@ def Exciting_PW(arg,i):
     else:
         print('Invalid source')
 
-psi_r,psi_im,norm = run(coupling)
+psi_r,psi_im,norm,ey,hz = run(coupling)
 
 print(norm)
 
@@ -171,6 +220,24 @@ plt.legend()
 plt.show()
 """
 
+print(ey[:,5000])
+animation_speed = 10000
+
+fig, ax = plt.subplots()
+ax.set_xlabel('X')
+ax.set_ylabel('ey')
+#ax.set_aspect('equal', adjustable='box')
+def animate(i):
+    ax.clear()
+    ax.plot(x_axis, ey[:,int(i*animation_speed)], c = 'black')
+    ax.axvline(x = x_place_qd, c = 'red', label = 'quantum dot')
+    ax.set_title(f'n = {int(i*animation_speed)}')
+
+plt.legend()
+anim = FuncAnimation(fig, animate)
+plt.show()
+
+
 animation_speed = 10000
 
 fig, ax = plt.subplots()
@@ -182,5 +249,4 @@ def animate(i):
     ax.plot(y_axis, psi_r[:,int(i*animation_speed)]**2 + psi_im[:,int(i*animation_speed)]**2, c = 'black')
     ax.set_title(f'n = {int(i*animation_speed)}')
 anim = FuncAnimation(fig, animate)
-plt.legend()
 plt.show()
