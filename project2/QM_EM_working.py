@@ -107,6 +107,7 @@ def Exciting_PW(arg,i):
         return Es_0*np.sin(omega_EM*i*delta_t)*f(i*delta_t)
     else:
         print('Invalid source')
+
 A = run()
 
 Norm = np.zeros((n_y,n_t))
