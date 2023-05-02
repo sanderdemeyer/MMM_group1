@@ -15,6 +15,20 @@ print(np.multiply(d, np.roll(d, 1, 0)))
 #0: behoud rijen, verander kolommen (voor i)
 #1: behoud kolommen, verander rijen (voor j)
 
+print(np.array([1+1j, 2j, 3]).imag)
+
+print((1 + 1j).imag)
+print(1j * 1j)
+print(a)
+
+n_t = 20
+y_axis = np.array([0, 1, 2, 3, 4, 5, 6, 7])
+
+delta_y_matrix = np.transpose(np.array([y_axis for i in range(n_t)]))
+print(delta_y_matrix)
+
+
+
 """
 print(np.linspace(0, 10, 10))
 n = 10

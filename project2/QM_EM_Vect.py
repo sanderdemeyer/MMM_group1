@@ -25,9 +25,10 @@ alpha = 0.9 #should be between 0.9 and 1.1
 omega_EM = alpha*omega_HO
 delta_x = 1*10**(-6) # grid size in the x-direction in meter
 delta_y = 0.5*10**(-9) # grid size in the y-direction in meter
+delta_y = 10*10**(-9) # grid size in the y-direction in meter
 n_y = int(L_y/delta_y) + 1 # Number of y grid cells
 n_x = int(L_x/delta_x) + 1 # Number of y grid cells
-t_sim = 1*10**(-12) # Total simulated time in seconds
+t_sim = 1*10**(-13) # Total simulated time in seconds
 #provide location of structure through boundary of y-domain
 y_start = -L_y/2
 Courant = 1 # Courant number
@@ -193,13 +194,70 @@ def Exciting_PW(arg,i):
     else:
         print('Invalid source')
 
+def expectation_value_position(psi_r, psi_im, y_axis):
+    exp_pos = np.zeros(n_t)
+    for i in range(n_t):
+        exp_pos[i] = np.sum((psi_r[:,i]**2 + psi_im[:,i]**2) * y_axis * delta_y)
+    return exp_pos
+
+def expectation_value_momentum(psi_r, psi_im):
+    exp_mom = np.zeros(n_t)
+    for i in range(n_t):
+        psi_r_i = psi_r[:,i]
+        psi_im_i = psi_im[:,i]
+        exp_mom[i] = np.sum(-1j*hbar*(psi_r_i - 1j*psi_im_i)*(np.roll(psi_r_i, -1) - psi_r_i + 1j*(np.roll(psi_im_i, -1) - psi_im_i)))
+    return exp_mom
+
+def expectation_value_energy(psi_r, psi_im):
+    exp_energy = np.zeros(n_t-2)
+    for i in range(1, n_t-1):
+        exp_energy[i-1] = np.sum(1j*hbar*(psi_r[:,i] - 1j*psi_im[:,i])*(psi_r[:,i] - psi_r[:,i-1] + 1j*(psi_im[:,i] - psi_im[:,i-1])))*delta_y/delta_t
+    return exp_energy
+
 psi_r,psi_im,norm,ey,hz = run(coupling)
+
+def check_continuity_equation(psi_r, psi_im):
+    error = np.zeros(n_t-1)
+    
+    for i in range(1,n_t):
+        dPdt = ((psi_r[:,i]**2 + psi_im[:,i]**2) - (psi_r[:,i-1]**2 + psi_im[:,i-1]**2))/delta_t
+        term1 = psi_r[:,i]*(np.roll(psi_im[:,i], 1) + np.roll(psi_im[:,i], -1) - 2*psi_im[:,i])
+        term2 = psi_im[:,i]*(np.roll(psi_r[:,i], 1) + np.roll(psi_r[:,i], -1) - 2*psi_r[:,i])
+        term1_with_const = hbar/(m*delta_y**2)*term1
+        term2_with_const = hbar/(m*delta_y**2)*term2
+        error = dPdt + hbar/(m*delta_y**2)*(term1 - term2)
+        error_tot = np.sum(error)
+        error_min = dPdt - hbar/(m*delta_y**2)*(term1 - term2)
+        error_min_tot = np.sum(error_min)
+        print('ok')
 
 print(norm)
 
 plt.plot(norm)
 plt.title('norm')
 plt.show()
+
+"""
+exp_pos = expectation_value_position(psi_r, psi_im, y_axis)
+plt.plot([i for i in range(n_t)], exp_pos)
+plt.title('expectation value of the position')
+plt.show()
+
+print(exp_pos.imag)
+
+exp_mom =  expectation_value_momentum(psi_r, psi_im)
+plt.plot([i for i in range(n_t)], exp_mom)
+plt.title('expectation value of the momentum')
+plt.show()
+"""
+
+exp_energy =  expectation_value_energy(psi_r, psi_im)
+plt.plot([i for i in range(n_t-2)], exp_energy)
+plt.title('expectation value of the momentum')
+plt.show()
+
+
+error = check_continuity_equation(psi_r, psi_im)
 
 """
 for i in range(n_t):
@@ -223,6 +281,7 @@ plt.legend()
 plt.show()
 """
 
+"""
 print(ey[:,5000])
 animation_speed = 10000
 
@@ -239,7 +298,7 @@ def animate(i):
 plt.legend()
 anim = FuncAnimation(fig, animate)
 plt.show()
-
+"""
 
 animation_speed = 10000
 
