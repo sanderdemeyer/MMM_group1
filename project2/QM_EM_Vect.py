@@ -42,7 +42,7 @@ x_place_qd = L_x/4 # place of the quantum dot
 x_qd = int(x_place_qd/delta_x) # y-coordinate of the quantum dot
 
 
-coupling = True
+coupling = False
 
 def update_matrix():
     A = np.zeros((n_y,n_y))
@@ -149,10 +149,13 @@ def run(coupling):
             psi_r_new = psi_r_old - hbar*delta_t/24/(m*delta_y**2)*(A @ psi_im_old) + delta_t/hbar*(V @ psi_im_old - q*y_axis*ey_old[x_qd]*psi_im_old)
             psi_im_new = psi_im_old + hbar*delta_t/24/(m*delta_y**2)*(A @ psi_r_new) - delta_t/hbar*(V @ psi_r_new - q*y_axis*ey_old[x_qd]*psi_im_old)
        
-        sigma = 25
+        sigma = 250
         Jy = np.zeros(n_x)
-        J0 = 10**10
-        Jy[3*n_x//4] = J0*np.exp(-(i-400)**2/(2*sigma**2))
+        if i < 1000:
+            J0 = 10**5*np.exp(-(i-500)**2/(2*sigma**2))
+        else:
+            J0 = 0
+        Jy[3*n_x//4] = J0
         ey_new = ey_old - delta_t/(epsilon*delta_x) * (hz_old - np.roll(hz_old, 1)) - (delta_t/epsilon)*Jy
         #ey_new = ey_old - delta_t/(epsilon*delta_x) * (np.roll(hz_old, -1) - hz_old) - (delta_t/epsilon)*Jy
         
