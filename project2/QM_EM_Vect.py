@@ -157,7 +157,7 @@ def run(coupling):
         else:
             J0 = 0
         Jy[3*n_x//4] = J0
-        ey_new = ey_old - delta_t/(epsilon*delta_x) * (hz_old - np.roll(hz_old, 1)) - (delta_t/epsilon)*Jy
+        ey_new = ey_old - delta_t/(epsilon*delta_x) * (hz_new - np.roll(hz_new, 1)) - (delta_t/epsilon)*Jy
         #ey_new = ey_old - delta_t/(epsilon*delta_x) * (np.roll(hz_old, -1) - hz_old) - (delta_t/epsilon)*Jy
         
         S = c*delta_t/delta_x
