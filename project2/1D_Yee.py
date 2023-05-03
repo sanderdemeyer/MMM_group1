@@ -31,9 +31,9 @@ def run():
         hz_new = hz_old - delta_t/(mu*delta_x)*(ey_old - np.roll(ey_old, 1))
        
         Jy = np.zeros(n_x)
-        if i == 2:
-            Jy[n_x//2] = 1
-        ey_new = ey_old - delta_t/(epsilon*delta_x) * (np.roll(hz_old, -1) - hz_old) - (delta_t/epsilon)*Jy
+        if i < 100 and i > 50:
+            Jy[n_x//2] = np.exp(-(i-75)**2/100)
+        ey_new = ey_old - delta_t/(epsilon*delta_x) * (np.roll(hz_new, -1) - hz_new) - (delta_t/epsilon)*Jy
 
         ey[:,i] = ey_new
         hz[:,i] = hz_new
@@ -48,7 +48,7 @@ ey,hz = run()
 
 print( delta_t/(mu*delta_x))
 print(delta_t/(epsilon*delta_x))
-animation_speed = 50
+animation_speed = 5
 
 fig, ax = plt.subplots()
 ax.set_xlabel('X')
