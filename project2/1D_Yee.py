@@ -11,8 +11,8 @@ epsilon = constants.epsilon_0
 c = constants.c
 print(c)
 print(1/np.sqrt(mu*epsilon))
-L_x = 1
-delta_x = 1*10**(-2) # grid size in the x-direction in meter
+L_x = 50*10**(-9)
+delta_x = 0.05*10**(-9) # grid size in the x-direction in meter
 n_x = int(L_x/delta_x) + 1 # Number of y grid cells
 #provide location of structure through boundary of y-domain
 Courant = 1 # Courant number
@@ -32,7 +32,7 @@ def run():
        
         Jy = np.zeros(n_x)
         if i < 100 and i > 50:
-            Jy[n_x//2] = np.exp(-(i-75)**2/100)
+            Jy[n_x//2] = np.exp(-(i-75)**2/20)
         ey_new = ey_old - delta_t/(epsilon*delta_x) * (np.roll(hz_new, -1) - hz_new) - (delta_t/epsilon)*Jy
 
         ey[:,i] = ey_new
