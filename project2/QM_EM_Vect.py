@@ -23,6 +23,7 @@ sigma_t = 10*10**(-15) # Width of the gaussian pulse
 t0 = 20*10**(-15) # Center of the gaussian pulse
 alpha = 1*10**(-16) #should be between 0.9 and 1.1
 omega_EM = alpha*omega_HO
+omega_EM = 7.5398*10**(15) # This makes the period equal to 500 time steps
 delta_x = 0.5*10**(-9) # grid size in the x-direction in meter
 delta_y = 0.5*10**(-9) # grid size in the y-direction in meter
 n_y = int(L_y/delta_y) + 1 # Number of y grid cells
@@ -30,7 +31,7 @@ n_x = int(L_x/delta_x) + 1 # Number of y grid cells
 t_sim = 10**(-13) # Total simulated time in seconds
 #provide location of structure through boundary of y-domain
 y_start = -L_y/2
-Courant = 0.99 # Courant number
+Courant = 1 # Courant number
 delta_t = 1/c*Courant*delta_y # time step based on the Courant number
 n_t = int(t_sim/delta_t) # Total number of time steps
 y_axis = np.linspace(y_start,y_start + (n_y-1)*delta_y,n_y)
@@ -113,12 +114,8 @@ def get_H_int(a):
     H_int.eliminate_zeros()
     return H_int
 
-
-
-
 def ABC():
     print('to do')
-
 
 def run(coupling):
     psi_r = np.zeros((n_y,n_t))
@@ -188,7 +185,8 @@ def run(coupling):
             if i > 11975 and i < 12025:
                 Jy[n_x//2] = J0*np.exp(-(i-t0)**2/(2*sigma_t**2))
         elif source == 'sine':
-            Jy[n_x//2] = J0*np.sin(omega_EM*i*delta_t)*np.tanh((i-t0)/sigma_t)
+            J0 = 10**(15)
+            Jy[n_x//2] = J0*np.sin(omega_EM*i*delta_t) #*np.tanh((i-t0)/sigma_t)
         else:
             print('wrong source')
         #Jy[3*n_x//4] = J0
