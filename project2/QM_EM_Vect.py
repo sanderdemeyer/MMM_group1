@@ -4,7 +4,8 @@ from scipy import constants
 from matplotlib.animation import FuncAnimation
 from scipy.sparse import csr_matrix
 from scipy.integrate import quad
-
+from scipy.sparse.linalg import inv as sparse_inv
+from scipy.sparse import identity as sparse_identity
 #define (fundamental) constants : hbar,massas,lenghts
 hbar = constants.hbar
 m = 0.15*constants.m_e 
@@ -47,6 +48,7 @@ x_qd = int(x_place_qd/delta_x) # y-coordinate of the quantum dot
 print(f'Zero-point energy is {omega_HO*hbar/2}')
 
 coupling = True
+gauge = 'velocity'
 
 norm_every_step = False
 
@@ -83,6 +85,49 @@ def update_matrix():
     A = csr_matrix(A)
     A.eliminate_zeros()
     return A
+
+def update_matrix_velocity():
+    A = np.zeros((n_y,n_y))
+    B = np.zeros((n_y,n_y))
+    for i in range(n_y):
+        if i == n_y-1:
+            A[i,i] = -30
+            A[i,i-1] = 16
+            A[i,0] = 16
+            A[i,i-2] = -1
+            A[i,1] = -1
+
+            B[i,i-1] = -8
+            B[i,0] = 8
+            B[i,i-2] = 1
+            B[i,1] = -1
+        elif i == n_y-2:
+            A[i,i] = -30
+            A[i,i-1] = 16
+            A[i,i+1] = 16
+            A[i,i-2] = -1
+            A[i,0] = -1
+
+            B[i,i-1] = -8
+            B[i,i+1] = 8
+            B[i,i-2] = 1
+            B[i,0] = -1
+        else:
+            A[i,i] = -30
+            A[i,i-1] = 16
+            A[i,i+1] = 16
+            A[i,i-2] = -1
+            A[i,i+2] = -1
+
+            B[i,i-1] = -8
+            B[i,i+1] = 8
+            B[i,i-2] = 1
+            B[i,i+2] = -1
+    A = csr_matrix(A)
+    A.eliminate_zeros()
+    B = csr_matrix(B)
+    B.eliminate_zeros()
+    return A, B
 
 def harmonic_potential_and_length():
     V = np.zeros((n_y,n_y))
@@ -129,10 +174,20 @@ def run(coupling):
 
     A = update_matrix()
     V,H_int = harmonic_potential_and_length()
-    
-    starting_point = 0
-    psi_r_old = (m*omega_HO/(constants.pi*hbar))**(1/4)*np.exp(-m*omega_HO/2/hbar*(y_axis-starting_point*(2*hbar/m/omega_HO)**(1/2)*alpha_y)**2)
-    psi_r_old = (m*omega_HO/(constants.pi*hbar))**(1/4)*np.exp(-m*omega_HO/2/hbar*(y_axis)**2)
+
+    A_vel, B_vel = update_matrix_velocity()
+    E0 = 1
+    B_plus = sparse_identity(n_y) + q*E0*delta_t/(24*m*omega_EM*delta_y)*B_vel
+    B_min = sparse_identity(n_y) - q*E0*delta_t/(24*m*omega_EM*delta_y)*B_vel
+    A_plus = -hbar*delta_t/(24*m*delta_y**2)*A_vel + V*delta_t/hbar
+    B_plus_inv = sparse_inv(B_plus)
+    B_min_inv = sparse_inv(B_min)
+
+    print('hooray')
+
+    starting_n_point = n_y//4
+    # psi_r_old = (m*omega_HO/(constants.pi*hbar))**(1/4)*np.exp(-m*omega_HO/2/hbar*(y_axis-starting_point*(2*hbar/m/omega_HO)**(1/2)*alpha_y)**2)
+    psi_r_old = (m*omega_HO/(constants.pi*hbar))**(1/4)*np.exp(-m*omega_HO/2/hbar*(y_axis - starting_n_point*delta_y)**2)
     psi_r[:,0] = psi_r_old
     psi_im_old = np.zeros(n_y)
     Norm[0] = (np.sum(psi_r_old**2) + np.sum(psi_im_old**2))*delta_y
@@ -163,7 +218,13 @@ def run(coupling):
 
             #psi_r_new = psi_r_old - hbar*delta_t/24/(m*delta_y**2)*(A @ psi_im_old) + delta_t/hbar*(V @ psi_im_old - q*y_axis*ey_old[x_qd]*psi_im_old)
             #psi_im_new = psi_im_old + hbar*delta_t/24/(m*delta_y**2)*(A @ psi_r_new) - delta_t/hbar*(V @ psi_r_new - q*y_axis*ey_old[x_qd]*psi_im_old)
-       
+        if gauge == 'velocity':
+            if coupling == False:
+                pass
+            else:
+                psi_r_new = B_plus_inv @ (A_plus @ psi_im_old + B_min @ psi_r_old)
+                psi_im_new = B_min_inv @ (-A_plus @ psi_r_new + B_min @ psi_im_old)
+
         if norm_every_step:
             norm_new = np.sqrt(np.sum(psi_r_old**2+psi_im_old**2)*delta_y)
             psi_r_new /= norm_new

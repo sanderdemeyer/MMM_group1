@@ -274,6 +274,7 @@ plt.show()
 
 error,t_ax = check_continuity_equation(psi_r, psi_im)
 plt.plot(t_ax,error)
+
 plt.show()
 """
 for i in range(n_t):
