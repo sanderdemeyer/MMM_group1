@@ -14,33 +14,39 @@ q = -constants.e
 mu = constants.mu_0
 epsilon = constants.epsilon_0
 
-L_x = 10*10**(-7) # Length in the x-direction in meter
+L_x = 1000*10**(-6) # Length in the x-direction in meter. Not to be confused by Lx as defined in the assignment, which is the width of a quantum dot.
 L_y = 100*10**(-9) # Length in the y-direction in meter
+L_x_size_quantum_dot = 0.5*10**(-9)
 N = 9*10**(27)
 omega_HO = 10*10**(12) # frequency of the HO
-Eg_0 = 5*10**6 # Amplitude of the PW-pulse if this is Gaussian
-Es_0 = 1*10**5 # Amplitude of the PW-pulse if this is a sine wave
-sigma_t = 10*10**(-15) # Width of the gaussian pulse
-t0 = 20*10**(-15) # Center of the gaussian pulse
-alpha = 1*10**(-16) #should be between 0.9 and 1.1
+Eg_0 = 5*10**6 # Amplitude of the PW-pulse if it is Gaussian
+Es_0 = 1*10**5 # Amplitude of the PW-pulse if it is a sine wave
+sigma_t = 10*10**(-15)*5/2 # Width of the gaussian pulse
+t0 = 20*10**(-15)*5 # Center of the gaussian pulse
+alpha = 0.95 #should be between 0.9 and 1.1
 omega_EM = alpha*omega_HO
 omega_EM = 7.5398*10**(15) # This makes the period equal to 500 time steps
-delta_x = 0.5*10**(-9) # grid size in the x-direction in meter
+delta_x = 1*10**(-6) # grid size in the x-direction in meter
 delta_y = 0.5*10**(-9) # grid size in the y-direction in meter
 n_y = int(L_y/delta_y) + 1 # Number of y grid cells
-n_x = int(L_x/delta_x) + 1 # Number of y grid cells
-t_sim = 10**(-13) # Total simulated time in seconds
+n_x = int(L_x/delta_x) + 1 # Number of x grid cells
+t_sim = 10**(-12) # Total simulated time in seconds
 #provide location of structure through boundary of y-domain
 y_start = -L_y/2
 Courant = 1 # Courant number
-delta_t = 1/c*Courant*delta_y # time step based on the Courant number
+delta_t = 1/c*Courant*delta_y # time step based on the Courant number. With the current definitions, this means that delta_t = 1.6667*10**(-18)
 n_t = int(t_sim/delta_t) # Total number of time steps
 y_axis = np.linspace(y_start,y_start + (n_y-1)*delta_y,n_y)
 x_axis = np.linspace(0, (n_x-1)*delta_x,n_x)
 #initialize both real and imaginary parts of the wave function psi. In case alpha is not real, the initialization needs to be adapted.
 alpha_y = 0
 
-source = 'sine' # should be either 'gaussian' or 'sine'
+source = 'gaussian' # should be either 'gaussian' or 'sine'
+
+if source == 'gaussian':
+    J0 = Eg_0*epsilon/np.sqrt(2*np.pi*sigma_t**2)*1000
+    sigma_gauss = sigma_t//delta_t
+    t0_gauss = t0//delta_t
 
 x_place_qd = L_x/4 # place of the quantum dot
 x_qd = int(x_place_qd/delta_x) # y-coordinate of the quantum dot
@@ -48,7 +54,8 @@ x_qd = int(x_place_qd/delta_x) # y-coordinate of the quantum dot
 print(f'Zero-point energy is {omega_HO*hbar/2}')
 
 coupling = True
-gauge = 'velocity'
+back_coupling = True
+gauge = 'length'
 
 norm_every_step = False
 
@@ -175,17 +182,19 @@ def run(coupling):
     A = update_matrix()
     V,H_int = harmonic_potential_and_length()
 
-    A_vel, B_vel = update_matrix_velocity()
-    E0 = 1
-    B_plus = sparse_identity(n_y) + q*E0*delta_t/(24*m*omega_EM*delta_y)*B_vel
-    B_min = sparse_identity(n_y) - q*E0*delta_t/(24*m*omega_EM*delta_y)*B_vel
-    A_plus = -hbar*delta_t/(24*m*delta_y**2)*A_vel + V*delta_t/hbar
-    B_plus_inv = sparse_inv(B_plus)
-    B_min_inv = sparse_inv(B_min)
+    if gauge == 'velocity':
+        A_vel, B_vel = update_matrix_velocity()
+        E0 = 1
+        B_plus = sparse_identity(n_y) + q*E0*delta_t/(24*m*omega_EM*delta_y)*B_vel
+        B_min = sparse_identity(n_y) - q*E0*delta_t/(24*m*omega_EM*delta_y)*B_vel
+        A_plus = -hbar*delta_t/(24*m*delta_y**2)*A_vel + V*delta_t/hbar
+        B_plus_inv = sparse_inv(B_plus)
+        B_min_inv = sparse_inv(B_min)
 
     print('hooray')
 
     starting_n_point = n_y//4
+    starting_n_point = 0
     # psi_r_old = (m*omega_HO/(constants.pi*hbar))**(1/4)*np.exp(-m*omega_HO/2/hbar*(y_axis-starting_point*(2*hbar/m/omega_HO)**(1/2)*alpha_y)**2)
     psi_r_old = (m*omega_HO/(constants.pi*hbar))**(1/4)*np.exp(-m*omega_HO/2/hbar*(y_axis - starting_n_point*delta_y)**2)
     psi_r[:,0] = psi_r_old
@@ -238,20 +247,27 @@ def run(coupling):
         else:
             J0 = 0
         """
+
+        """
         J0 = 10**(17)*1.3
-        t0 = 12000
-        sigma_t = 2.3
+        t0_gauss = 100000
+        sigma_gauss = 15000
+        sigma_t = 10000
+        """
 
         if source == 'gaussian':
-            if i > 11975 and i < 12025:
-                Jy[n_x//2] = J0*np.exp(-(i-t0)**2/(2*sigma_t**2))
+            if i > t0_gauss - 5*sigma_gauss and i < t0_gauss + 5*sigma_gauss:
+                Jy[n_x//3] = J0*np.exp(-(i-t0_gauss)**2/(2*sigma_gauss**2))
         elif source == 'sine':
-            J0 = 10**(15)
-            Jy[n_x//2] = J0*np.sin(omega_EM*i*delta_t) #*np.tanh((i-t0)/sigma_t)
+            Jy[n_x//2] = J0*np.sin(omega_EM*i*delta_t)*np.tanh((i-t0)/sigma_t)
         else:
             print('wrong source')
         #Jy[3*n_x//4] = J0
-        ey_new = ey_old - delta_t/(epsilon*delta_x) * (np.roll(hz_new, -1) - hz_new) - (delta_t/epsilon)*Jy
+        j_q = np.zeros(n_x)
+        if back_coupling:
+            j_q[x_qd] = q*hbar*N/(2*m)*np.sum(psi_r_new*np.roll(psi_im_new+psi_im_old,-1) - np.roll(psi_r_new,-1)*(psi_im_new+psi_im_old))
+
+        ey_new = ey_old - delta_t/(epsilon*delta_x) * (np.roll(hz_new, -1) - hz_new) - (delta_t/epsilon)*Jy - delta_t*L_x_size_quantum_dot/(epsilon*delta_x)*j_q
         #ey_new = ey_old - delta_t/(epsilon*delta_x) * (np.roll(hz_old, -1) - hz_old) - (delta_t/epsilon)*Jy
         
         S = c*delta_t/delta_x
@@ -310,14 +326,14 @@ def expectation_value_kinetic_energy(psi_r, psi_im):
     for i in range(n_t):
         psi_r_i = psi_r[:,i]
         psi_im_i = psi_im[:,i]
-        exp_kin[i] = -hbar**2/(2*m)*np.sum((psi_r_i - 1j*psi_im_i)*(np.roll(psi_r_i,1)+np.roll(psi_r_i,-1)-2*psi_r_i + 1j*(np.roll(psi_im_i,1)+np.roll(psi_im_i,-1)-2*psi_im_i)))/delta_x
+        exp_kin[i] = -hbar**2/(2*m)*np.sum((psi_r_i - 1j*psi_im_i)*(np.roll(psi_r_i,1)+np.roll(psi_r_i,-1)-2*psi_r_i + 1j*(np.roll(psi_im_i,1)+np.roll(psi_im_i,-1)-2*psi_im_i)))/delta_y
     return exp_kin
 
 def expectation_value_potential_energy(psi_r, psi_im):
     exp_pot = np.zeros(n_t)
     V = potential_diag()
     for i in range(n_t):
-        exp_pot[i] = np.sum(((psi_r[:,i])**2 + (psi_im[:,i])**2)*V)*delta_x
+        exp_pot[i] = np.sum(((psi_r[:,i])**2 + (psi_im[:,i])**2)*V)*delta_y
     return exp_pot
 
 def expectation_value_energy(psi_r, psi_im):
@@ -410,7 +426,7 @@ plt.show()
 """
 
 
-animation_speed = 1000
+animation_speed = 2500
 
 fig, ax = plt.subplots()
 ax.set_xlabel('X')
@@ -427,7 +443,7 @@ anim = FuncAnimation(fig, animate)
 plt.show()
 
 
-animation_speed = 1000
+animation_speed = 2500
 
 fig, ax = plt.subplots()
 ax.set_xlabel('Y')
