@@ -33,7 +33,7 @@ delta_x = 1*10**(-6) # grid size in the x-direction in meter
 delta_y = 0.5*10**(-9) # grid size in the y-direction in meter
 n_y = int(L_y/delta_y) + 1 # Number of y grid cells
 n_x = int(L_x/delta_x) + 1 # Number of x grid cells
-t_sim = 10**(-12) # Total simulated time in seconds
+t_sim = 10**(-12)/100 # Total simulated time in seconds
 #provide location of structure through boundary of y-domain
 y_start = -L_y/2
 Courant = 1 # Courant number
@@ -58,7 +58,7 @@ print(f'Zero-point energy is {omega_HO*hbar/2}')
 
 coupling = True
 back_coupling = False
-gauge = 'velocity'
+gauge = 'length'
 
 norm_every_step = False
 
@@ -395,6 +395,8 @@ def check_continuity_equation(psi_r, psi_im):
         term2 = psi_im[:,i]*(np.roll(psi_r[:,i], 1) + np.roll(psi_r[:,i], -1) - 2*psi_r[:,i])/delta_y
         term1_with_const = hbar/(m*delta_y**2)*term1
         term2_with_const = hbar/(m*delta_y**2)*term2
+        print(term1_with_const[100:120] - term2_with_const[100:120])
+        print(dPdt[100:120])
         error = dPdt + hbar/(m*delta_y**2)*(term1 - term2)
         error_tot = np.sum(error)
         error_min = dPdt - hbar/(m*delta_y**2)*(term1 - term2)
@@ -425,9 +427,13 @@ plt.title('expectation value of the momentum')
 plt.show()
 """
 
+check_continuity_equation(psi_r, psi_im)
+
 exp_energy =  expectation_value_energy(psi_r, psi_im)
 exp_pot =  expectation_value_potential_energy(psi_r, psi_im)
 exp_kin =  expectation_value_kinetic_energy(psi_r, psi_im)
+
+
 
 print(exp_energy[200:210])
 print(exp_pot[200:210])
