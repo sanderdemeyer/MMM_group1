@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.sparse import csr_matrix
+import matplotlib.pyplot as plt
 """
 print(d)
 print(np.roll(d, 1, 0))
@@ -19,6 +20,23 @@ print(np.array([1+1j, 2j, 3]).imag)
 
 print((1 + 1j).imag)
 print(1j * 1j)
+
+t0 = 200000
+sigma_ramping = 90000
+
+x = np.linspace(-10, 10, 1000)
+plt.plot(x, np.exp(-x**2))
+plt.plot(x, (1+np.tanh(x))/2)
+plt.show()
+
+
+
+x = np.linspace(0, 600000, 10**6)
+plt.plot(x, np.tanh((x-t0)/sigma_ramping))
+plt.show()
+
+
+
 print(a)
 
 n_t = 20

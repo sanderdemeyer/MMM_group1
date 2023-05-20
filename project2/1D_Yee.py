@@ -108,7 +108,7 @@ x_axis = np.linspace(0, (n_x-1)*delta_x,n_x)
 #initialize both real and imaginary parts of the wave function psi. In case alpha is not real, the initialization needs to be adapted.
 alpha_y = 0
 
-source = 'gaussian' # should be either 'gaussian' or 'sine'
+source = 'sine' # should be either 'gaussian' or 'sine'
 
 x_place_qd = L_x/4 # place of the quantum dot
 x_qd = int(x_place_qd/delta_x) # y-coordinate of the quantum dot
@@ -228,6 +228,7 @@ def run(coupling):
         sigma_gauss = 15000
         sigma_ramping = 100000
 
+        """
         if source == 'gaussian':
             if i > t0_gauss - 5*sigma_gauss and i < t0_gauss + 5*sigma_gauss:
                 Jy[n_x//2] = J0*np.exp(-(i-t0_gauss)**2/(2*sigma_gauss**2))
@@ -236,11 +237,28 @@ def run(coupling):
             Jy[n_x//2] = J0*np.sin(omega_EM*i*delta_t)*np.tanh((i-t0)/sigma_ramping)
         else:
             print('wrong source')
+        """
         #Jy[3*n_x//4] = J0
         j_q = 0
-        ey_new = ey_old - delta_t/(epsilon*delta_x) * (np.roll(hz_new, -1) - hz_new) - (delta_t/epsilon)*Jy - delta_t*L_x_size_quantum_dot/(epsilon*delta_x)*j_q
         #ey_new = ey_old - delta_t/(epsilon*delta_x) * (np.roll(hz_old, -1) - hz_old) - (delta_t/epsilon)*Jy
         
+        if source == 'gaussian':
+            if i > t0_gauss - 5*sigma_gauss and i < t0_gauss + 5*sigma_gauss:
+                ey_new[n_x//3] = Eg_0*np.exp(-(i-t0_gauss)**2/(2*sigma_gauss**2))
+                
+        elif source == 'sine':
+            J0 = 10**5
+            t0 = 30000
+            sigma_ramping = 5000
+            # ey_new[n_x//3] += Es_0*np.sin(omega_EM*i*delta_t)
+            Jy[n_x//2] = J0*np.sin(omega_EM*i*delta_t)*np.tanh((i-t0)/sigma_t)
+
+        else:
+            print('wrong source')
+
+        ey_new = ey_old - delta_t/(epsilon*delta_x) * (np.roll(hz_new, -1) - hz_new) - (delta_t/epsilon)*Jy - delta_t*L_x_size_quantum_dot/(epsilon*delta_x)*j_q
+
+
         S = c*delta_t/delta_x
         ey_new[0] = ey_old[1] + (1-S)/(1+S)*(ey_old[0]-ey_new[1])
         ey_new[-1] = ey_old[-2] + (1-S)/(1+S)*(ey_old[-1]-ey_new[-2])
