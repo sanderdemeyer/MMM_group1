@@ -16,10 +16,22 @@ print(np.multiply(d, np.roll(d, 1, 0)))
 #0: behoud rijen, verander kolommen (voor i)
 #1: behoud kolommen, verander rijen (voor j)
 
+
+
+
+
+
+
+
 print(np.array([1+1j, 2j, 3]).imag)
 
 print((1 + 1j).imag)
 print(1j * 1j)
+
+x = np.linspace(-10, 10, 1000)
+plt.plot(x, x/2*(1+x/np.sqrt(x**2 + 0.01**2)))
+plt.show()
+
 
 t0 = 200000
 sigma_ramping = 90000

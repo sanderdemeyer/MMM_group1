@@ -92,7 +92,7 @@ sigma_t = 10*10**(-15) # Width of the gaussian pulse
 t0 = 20*10**(-15) # Center of the gaussian pulse
 alpha = 0.95 #should be between 0.9 and 1.1
 omega_EM = alpha*omega_HO
-omega_EM = 7.5398*10**(15) # This makes the period equal to 500 time steps
+#omega_EM = 7.5398*10**(15) # This makes the period equal to 500 time steps
 delta_x = 1*10**(-6) # grid size in the x-direction in meter
 delta_y = 0.5*10**(-9) # grid size in the y-direction in meter
 n_y = int(L_y/delta_y) + 1 # Number of y grid cells
@@ -251,7 +251,7 @@ def run(coupling):
             t0 = 30000
             sigma_ramping = 5000
             # ey_new[n_x//3] += Es_0*np.sin(omega_EM*i*delta_t)
-            Jy[n_x//2] = J0*np.sin(omega_EM*i*delta_t)*np.tanh((i-t0)/sigma_t)
+            Jy[n_x//2] = J0*np.sin(omega_EM*i*delta_t)*np.tanh((i*delta_t-t0)/sigma_t)
 
         else:
             print('wrong source')

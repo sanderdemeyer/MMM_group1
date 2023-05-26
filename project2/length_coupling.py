@@ -28,12 +28,12 @@ sigma_t = 10*10**(-15)*5/2 # Width of the gaussian pulse
 t0 = 20*10**(-15)*5 # Center of the gaussian pulse
 alpha = 0.95 #should be between 0.9 and 1.1
 omega_EM = alpha*omega_HO
-#omega_EM = 7.5398*10**(15) # This makes the period equal to 500 time steps
+omega_EM = 7.5398*10**(15) # This makes the period equal to 500 time steps
 delta_x = 1*10**(-6) # grid size in the x-direction in meter
 delta_y = 0.5*10**(-9) # grid size in the y-direction in meter
 n_y = int(L_y/delta_y) + 1 # Number of y grid cells
 n_x = int(L_x/delta_x) + 1 # Number of x grid cells
-t_sim = 10**(-12)/50 # Total simulated time in seconds
+t_sim = 10**(-12)/10 # Total simulated time in seconds
 #provide location of structure through boundary of y-domain
 y_start = -L_y/2
 Courant = 1 # Courant number
@@ -56,11 +56,11 @@ x_qd = int(x_place_qd/delta_x) # y-coordinate of the quantum dot
 
 print(f'Zero-point energy is {omega_HO*hbar/2}')
 
-coupling = False
-back_coupling = False
 gauge = 'length'
 
-norm_every_step = False
+
+animation_speed = 2500
+n_snapshots = n_t//animation_speed
 
 def update_matrix():
     A = np.zeros((n_y,n_y))
@@ -172,15 +172,14 @@ def get_H_int(a):
 def ABC():
     print('to do')
 
-def run(coupling):
-    psi_r = np.zeros((n_y,n_t))
-    psi_im = np.zeros((n_y,n_t))
-    psi_squared = np.zeros((n_y, n_t))
-    psi_squared_cut = np.zeros((n_y, n_t//1000+1))
+def run():
+    psi_r = np.zeros((n_y,n_snapshots+1))
+    psi_im = np.zeros((n_y,n_snapshots+1))
+    psi_squared = np.zeros((n_y, n_snapshots+1))
     Norm = np.zeros(n_t)
 
-    ey = np.zeros((n_x, n_t))
-    hz = np.zeros((n_x, n_t))
+    ey = np.zeros((n_x, n_snapshots+1))
+    hz = np.zeros((n_x, n_snapshots+1))
 
     A = update_matrix()
     V,H_int = harmonic_potential_and_length()
@@ -202,8 +201,6 @@ def run(coupling):
     print('hooray')
 
     starting_n_point = n_y//4
-    starting_n_point = 0
-
     # psi_r_old = (m*omega_HO/(constants.pi*hbar))**(1/4)*np.exp(-m*omega_HO/2/hbar*(y_axis-starting_point*(2*hbar/m/omega_HO)**(1/2)*alpha_y)**2)
     psi_r_old = (m*omega_HO/(constants.pi*hbar))**(1/4)*np.exp(-m*omega_HO/2/hbar*(y_axis - starting_n_point*delta_y)**2)
     psi_r[:,0] = psi_r_old
@@ -217,118 +214,39 @@ def run(coupling):
     for i in range(1,n_t):
         hz_new = hz_old - delta_t/(mu*delta_x)*(ey_old - np.roll(ey_old, 1))
 
-        if gauge == 'length':
-            if coupling == False:
-                psi_r_new = psi_r_old - hbar*delta_t*(A @ psi_im_old)/(24*m*(delta_y**2)) + delta_t*(V @ psi_im_old)/hbar
-                psi_im_new = psi_im_old + hbar*delta_t/24/(m*delta_y**2)*(A @ psi_r_new) - delta_t/hbar*(V @ psi_r_new)
-                ey_new = ey_old - delta_t/(epsilon*delta_x) * (np.roll(hz_new, -1) - hz_new) - (delta_t/epsilon)*Jy
+        ey_new = ey_old - delta_t/(epsilon*delta_x) * (np.roll(hz_new, -1) - hz_new) - (delta_t/epsilon)*Jy
+
+        psi_r_new = psi_r_old - hbar*delta_t*(
+            -np.roll(psi_im_old,2)+16*np.roll(psi_im_old,1)-30*psi_im_old+16*np.roll(psi_im_old,-1)-np.roll(psi_im_old,-2)
+            )/(24*m*(delta_y**2)) + delta_t*(V_diag*psi_im_old - q*y_axis*ey_old[x_qd]*psi_im_old)/hbar
+        psi_im_new = psi_im_old + hbar*delta_t/24/(m*delta_y**2)*(
+            -np.roll(psi_r_new,2)+16*np.roll(psi_r_new,1)-30*psi_r_new+16*np.roll(psi_r_new,-1)-np.roll(psi_r_new,-2)
+            ) - delta_t/hbar*(V_diag*psi_r_new - q*y_axis/2*(ey_old[x_qd]+ey_new[x_qd])*psi_r_new)
+
+
+        if i > t0_gauss - 5*sigma_gauss and i < t0_gauss + 5*sigma_gauss:
+            if source == 'gaussian':
+                ey_new[n_x//3] = Eg_0*np.exp(-(i-t0_gauss)**2/(2*sigma_gauss**2))
+            elif source == 'sine':
+                ey_new[n_x//2] = Es_0*np.sin(omega_EM*i*delta_t)*np.tanh((i-t0)/sigma_t)
             else:
-                if back_coupling == False:
-                    #ey_new = ey_old - delta_t/(epsilon*delta_x) * (np.roll(hz_old, -1) - hz_old) - (delta_t/epsilon)*Jy
-                    """
-                    psi_r_new = psi_r_old - hbar*delta_t*(A @ psi_im_old)/(24*m*(delta_y**2)) + delta_t*(V @ psi_im_old - q*y_axis*ey_old[x_qd]*psi_im_old)/hbar
-                    psi_im_new = psi_im_old + hbar*delta_t/24/(m*delta_y**2)*(A @ psi_r_new) - delta_t/hbar*(V @ psi_r_new - q*y_axis*ey_old[x_qd]*psi_r_new)
-                    """
-                    psi_r_new = psi_r_old - hbar*delta_t*(
-                        -np.roll(psi_im_old,2)+16*np.roll(psi_im_old,1)-30*psi_im_old+16*np.roll(psi_im_old,-1)-np.roll(psi_im_old,-2)
-                        )/(24*m*(delta_y**2)) + delta_t*(V_diag*psi_im_old - q*y_axis*ey_old[x_qd]*psi_im_old)/hbar
-                    psi_im_new = psi_im_old + hbar*delta_t/24/(m*delta_y**2)*(
-                        -np.roll(psi_r_new,2)+16*np.roll(psi_r_new,1)-30*psi_r_new+16*np.roll(psi_r_new,-1)-np.roll(psi_r_new,-2)
-                        ) - delta_t/hbar*(V_diag*psi_r_new - q*y_axis/2*(ey_old[x_qd]+ey_new[x_qd])*psi_r_new)
-                else:
-                    psi_r_new = psi_r_old - hbar*delta_t*(
-                        -np.roll(psi_im_old,2)+16*np.roll(psi_im_old,1)-30*psi_im_old+16*np.roll(psi_im_old,-1)-np.roll(psi_im_old,-2)
-                        )/(24*m*(delta_y**2)) + delta_t*(V_diag*psi_im_old - q*y_axis*ey_old[x_qd]*psi_im_old)/hbar
-                    psi_im_new = psi_im_old + hbar*delta_t/24/(m*delta_y**2)*(
-                        -np.roll(psi_r_new,2)+16*np.roll(psi_r_new,1)-30*psi_r_new+16*np.roll(psi_r_new,-1)-np.roll(psi_r_new,-2)
-                        ) - delta_t/hbar*(V_diag*psi_r_new - q*y_axis*ey_old[x_qd]*psi_r_new)
-                    
-                    j_q = np.zeros(n_x)
-                    j_q[x_qd] = q*hbar*N/(2*m)*np.sum(psi_r_new*np.roll(psi_im_new+psi_im_old,-1) - np.roll(psi_r_new,-1)*(psi_im_new+psi_im_old))
-                    ey_new = ey_old - delta_t/(epsilon*delta_x) * (np.roll(hz_new, -1) - hz_new) - (delta_t/epsilon)*Jy - delta_t*L_x_size_quantum_dot/(epsilon*delta_x)*j_q
-
-        if gauge == 'velocity':
-            if coupling == False:
-                pass
-            else:
-                if back_coupling == False:
-                    ey_new = ey_old - delta_t/(epsilon*delta_x) * (np.roll(hz_new, -1) - hz_new) - (delta_t/epsilon)*Jy
-                    a += -ey_old[x_qd]*delta_t
-
-                    """
-                    B_plus = sparse_identity(n_y) - q*a*delta_t/(24*m*delta_y)*B_vel
-                    B_min = sparse_identity(n_y) + q*a*delta_t/(24*m*delta_y)*B_vel
-                    B_plus_inv = sparse_inv(B_plus)
-                    B_min_inv = sparse_inv(B_min)
-
-                    psi_r_new = B_plus_inv @ (A_plus @ psi_im_old + B_min @ psi_r_old)
-                    psi_im_new = B_min_inv @ (-A_plus @ psi_r_new + B_min @ psi_im_old)
-                    """
-                    B_plus = sparse_identity(n_y) + q*a*delta_t/(24*m*delta_y)*B_vel
-                    B_min = sparse_identity(n_y) - q*a*delta_t/(24*m*delta_y)*B_vel
-
-                    psi_r_new = spsolve(B_plus, A_plus @ psi_im_old + B_min @ psi_r_old)
-                    #psi_im_new = spsolve(B_min, -A_plus @ psi_r_new + B_min @ psi_im_old)
-                    psi_im_new = spsolve(B_plus, -A_plus @ psi_r_new + B_min @ psi_im_old)
-                else:
-                    B_plus = sparse_identity(n_y) + q*a*delta_t/(24*m*delta_y)*B_vel
-                    B_min = sparse_identity(n_y) - q*a*delta_t/(24*m*delta_y)*B_vel
-
-                    psi_r_new = spsolve(B_plus, A_plus @ psi_im_old + B_min @ psi_r_old)
-                    #psi_im_new = spsolve(B_min, -A_plus @ psi_r_new + B_min @ psi_im_old)
-                    psi_im_new = spsolve(B_plus, -A_plus @ psi_r_new + B_min @ psi_im_old)
-
-                    j_q = np.zeros(n_x)
-                    j_q[x_qd] = q*hbar*N/(2*m)*np.sum(psi_r_new*np.roll(psi_im_new+psi_im_old,-1) - np.roll(psi_r_new,-1)*(psi_im_new+psi_im_old))
-                    ey_new = ey_old - delta_t/(epsilon*delta_x) * (np.roll(hz_new, -1) - hz_new) - (delta_t/epsilon)*Jy - delta_t*L_x_size_quantum_dot/(epsilon*delta_x)*j_q
-
-                    a += -ey_new[x_qd]*delta_t
-
-        if norm_every_step:
-            norm_new = np.sqrt(np.sum(psi_r_old**2+psi_im_old**2)*delta_y)
-            psi_r_new /= norm_new
-            psi_im_new /= norm_new
-
-        """
-        sigma = 250
-        Jy = np.zeros(n_x)
-        J0 = 0
-        if source == 'gaussian':
-            if i > t0_gauss - 5*sigma_gauss and i < t0_gauss + 5*sigma_gauss:
-                Jy[n_x//3] = J0*np.exp(-(i-t0_gauss)**2/(2*sigma_gauss**2))
-                
-        elif source == 'sine':
-            Jy[n_x//2] = J0*np.sin(omega_EM*i*delta_t)*np.tanh((i-t0)/sigma_t)
-        else:
-            print('wrong source')
-        #Jy[3*n_x//4] = J0
-        """
-
-        
-        if source == 'gaussian':
-            if i > t0_gauss - 5*sigma_gauss and i < t0_gauss + 5*sigma_gauss:
-                ey_new[int(n_x/3)] = Eg_0*np.exp(-(i-t0_gauss)**2/(2*sigma_gauss**2))
-                
-        elif source == 'sine':
-            ey_new[n_x//2] = Es_0*np.sin(omega_EM*i*delta_t)*np.tanh((i*delta_t-t0)/sigma_t)
-        else:
-            #print('wrong source')
-            pass
+                print('wrong source')
         
         S = c*delta_t/delta_x
         ey_new[0] = ey_old[1] + (1-S)/(1+S)*(ey_old[0]-ey_new[1])
         ey_new[-1] = ey_old[-2] + (1-S)/(1+S)*(ey_old[-1]-ey_new[-2])
 
-        psi_r[:,i] = psi_r_new
-        psi_im[:,i] = psi_im_new 
-        psi_squared[:,i] = (psi_r_new)**2 + (psi_im_new)**2
+        if i % animation_speed == 0:
+            t_now = i//animation_speed
+            psi_r[:,t_now] = psi_r_new
+            psi_im[:,t_now] = psi_im_new 
+            psi_squared[:,t_now] = (psi_r_new)**2 + (psi_im_new)**2
+            ey[:,t_now] = ey_new
+            hz[:,t_now] = hz_new
+
         psi_r_old = psi_r_new
         psi_im_old = psi_im_new
-        if i % 1000 == 0:
-            psi_squared_cut[:,i//1000] = (psi_r_new)**2 + (psi_im_new)**2
 
-        ey[:,i] = ey_new
-        hz[:,i] = hz_new
         ey_old = ey_new
         hz_old = hz_new
 
@@ -336,7 +254,7 @@ def run(coupling):
 
         if i%1000 == 0:
             print(f'Done iteration {i} of {n_t}')
-    return psi_r,psi_im, Norm, ey, hz, psi_squared, psi_squared_cut
+    return psi_r,psi_im, Norm, ey, hz, psi_squared
 
 def f(t):
     '''
@@ -386,7 +304,7 @@ def expectation_value_kinetic_energy(psi_r, psi_im):
 
 def expectation_value_potential_energy(psi_r, psi_im):
     V = potential_diag()
-    V = np.transpose(np.array([V for t in range(n_t)]))
+    V = np.transpose(np.array([V for t in range(n_snapshots+1)]))
     exp_pot = np.sum(((psi_r)**2 + (psi_im)**2)*V,0)*delta_y
 
     """
@@ -398,7 +316,7 @@ def expectation_value_potential_energy(psi_r, psi_im):
     return exp_pot
 
 def expectation_value_energy(psi_r, psi_im):
-    exp_energy = np.sum(1j*hbar*(psi_r - 1j*psi_im)*(psi_r - np.roll(psi_r,1) + 1j*(psi_im - np.roll(psi_im,1))),0)*delta_y/delta_t
+    exp_energy = np.sum(1j*hbar*(psi_r - 1j*psi_im)*(psi_r - np.roll(psi_r,1) + 1j*(psi_im - np.roll(psi_im,1))),0)*delta_y/(animation_speed*delta_t)
     """
     exp_energy = np.zeros(n_t-2)
     for i in range(1, n_t-1):
@@ -408,6 +326,7 @@ def expectation_value_energy(psi_r, psi_im):
 
 def check_continuity_equation(psi_r, psi_im):
     error = np.zeros(n_t-1)
+    
     for i in range(1,n_t):
         dPdt = ((psi_r[:,i]**2 + psi_im[:,i]**2) - (psi_r[:,i-1]**2 + psi_im[:,i-1]**2))/delta_t
 
@@ -415,51 +334,33 @@ def check_continuity_equation(psi_r, psi_im):
         term2 = psi_im[:,i]*(np.roll(psi_r[:,i], 1) + np.roll(psi_r[:,i], -1) - 2*psi_r[:,i])/delta_y**2
         term1_with_const = hbar/(m)*term1
         term2_with_const = hbar/(m)*term2
-        term_dif = term1_with_const - term2_with_const
-        error = dPdt + (term1_with_const - term2_with_const)
-        relative_error = np.divide(error, dPdt)
-        relative_error_min = np.divide(dPdt - (term1_with_const - term2_with_const), dPdt)
-        print(np.mean(relative_error))
-        print(np.sum(relative_error))
-        print(np.sum(error))
-        print('again')
-        print(np.sum(dPdt))
-
-        print(np.sum(term_dif))
-        if i == 1000:
-            print('new')
-            print(np.sum(psi_r[:,i]**2 + psi_im[:,i]**2)*delta_y)
-            print(np.sum(dPdt)*delta_y)
-            print(np.sum(dPdt)*delta_y*delta_t)
-            print(np.sum(term1_with_const)*delta_y)
-            print(np.sum(term2_with_const)*delta_y)
-            print(np.sum(term1_with_const - term2_with_const)*delta_y)
-            print('hey1')
-            print(term1_with_const[100:120])
-            print('hey2')
-            print(term2_with_const[100:120])
-            print('hey3')
-            print(term1_with_const[100:120] - term2_with_const[100:120])
-            print('hey4')
-            print(dPdt[100:120])
-            print('hey5')
+        """
+        print(np.sum(psi_r[:,i]**2 + psi_im[:,i]**2)*delta_y)
+        print(np.sum(dPdt)*delta_y)
+        print(np.sum(dPdt)*delta_y*delta_t)
+        print(np.sum(term1_with_const)*delta_y)
+        print(np.sum(term2_with_const)*delta_y)
+        print(np.sum(term1_with_const - term2_with_const)*delta_y)
+        print('hey1')
+        print(term1_with_const[100:120])
+        print('hey2')
+        print(term2_with_const[100:120])
+        print('hey3')
+        print(term1_with_const[100:120] - term2_with_const[100:120])
+        print('hey4')
+        print(dPdt[100:120])
+        print('hey5')
+        if i > 1000:
             print('ok')
+        print(np.divide((term1_with_const[100:120] - term2_with_const[100:120]), dPdt[100:120]))
+        """
+        error = dPdt + hbar/(m*delta_y**2)*(term1 - term2)
+        error_tot = np.sum(error)
+        error_min = dPdt - hbar/(m*delta_y**2)*(term1 - term2)
+        error_min_tot = np.sum(error_min)
 
-def check_continuity_equation_new(psi_r, psi_im):
-    error = np.zeros(n_t-1)
-    for i in range(1,n_t):
-        dPdt = ((psi_r[:,i]**2 + psi_im[:,i]**2) - (psi_r[:,i-1]**2 + psi_im[:,i-1]**2))/delta_t
 
-        term1 = psi_r[:,i]*(np.roll(psi_im[:,i], 1) + np.roll(psi_im[:,i], -1) - 2*psi_im[:,i])/delta_y**2
-        term2 = psi_im[:,i]*(np.roll(psi_r[:,i], 1) + np.roll(psi_r[:,i], -1) - 2*psi_r[:,i])/delta_y**2
-        term1_with_const = hbar/(m)*term1
-        term2_with_const = hbar/(m)*term2
-
-        error[i] = dPdt + hbar/(m)*(term1 - term2)
-    error_tot = np.sum(error)
-    return error_tot
-
-psi_r,psi_im,norm,ey,hz,psi_squared,psi_squared_cut = run(coupling)
+psi_r,psi_im,norm,ey,hz,psi_squared = run()
 
 
 plt.plot(norm)
@@ -480,13 +381,13 @@ plt.title('expectation value of the momentum')
 plt.show()
 """
 
-#check_continuity_equation(psi_r, psi_im)
+# check_continuity_equation(psi_r, psi_im)
 
 print('started with energy')
 exp_energy =  expectation_value_energy(psi_r, psi_im)
-print('started with potential energy')
+print('started with energy')
 exp_pot =  expectation_value_potential_energy(psi_r, psi_im)
-print('started with kinetic energy')
+print('started with energy')
 exp_kin =  expectation_value_kinetic_energy(psi_r, psi_im)
 
 
@@ -495,14 +396,11 @@ print(exp_energy[200:210])
 print(exp_pot[200:210])
 print(exp_kin[200:210])
 """
-plt.plot([i for i in range(n_t-2)], exp_energy, label = 'energy')
-plt.plot([i for i in range(n_t)], exp_pot, label = 'potential energy')
-plt.plot([i for i in range(n_t)], exp_kin, label = 'kinetic energy')
+plt.plot(range(len(exp_energy)), exp_energy, label = 'energy')
+plt.plot(range(len(exp_pot)), exp_pot, label = 'potential energy')
+plt.plot(range(len(exp_kin)), exp_kin, label = 'kinetic energy')
 plt.title('expectation value of the energy')
 plt.legend()
-plt.show()
-
-plt.imshow(psi_squared_cut)
 plt.show()
 
 
@@ -544,7 +442,6 @@ anim = ArtistAnimation(fig, ims, interval=20)
 plt.show()
 """
 
-animation_speed = 2500
 
 fig, ax = plt.subplots()
 ax.set_xlabel('x')
@@ -552,7 +449,7 @@ ax.set_xlabel('x')
 def animate(i):
     ax.clear()
     ax.set_ylabel('ey')
-    ax.plot(x_axis, ey[:,int(i*animation_speed)], c = 'black')
+    ax.plot(x_axis, ey[:,int(i)], c = 'black')
     ax.axvline(x = x_place_qd, c = 'red', label = 'quantum dot')
     ax.set_title(f'n = {int(i*animation_speed)}')
 
@@ -572,7 +469,7 @@ ax.set_ylabel('psi')
 #ax.set_aspect('equal', adjustable='box')
 def animate(i):
     ax.clear()
-    ax.plot(y_axis, psi_r[:,int(i*animation_speed)]**2 + psi_im[:,int(i*animation_speed)]**2, c = 'black')
+    ax.plot(y_axis, psi_r[:,int(i)]**2 + psi_im[:,int(i)]**2, c = 'black')
     ax.set_title(f'n = {int(i*animation_speed)}')
 anim = FuncAnimation(fig, animate)
 plt.show()
