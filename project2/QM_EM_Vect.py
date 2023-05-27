@@ -398,8 +398,9 @@ def expectation_value_position(psi_r, psi_im, y_axis):
     """
     return exp_pos
 
-def expectation_value_momentum(psi_r, psi_im):
+def expectation_value_momentum(psi_r, psi_im, a):
     exp_mom = np.sum(-1j*hbar*(psi_r - 1j*psi_im)*(np.roll(psi_r, -1,0) - psi_r + 1j*(np.roll(psi_im, -1,0) - psi_im)),0)
+    exp_mom_2 = q*a
     """
     exp_mom = np.zeros(n_t)
     for i in range(n_t):
@@ -407,13 +408,14 @@ def expectation_value_momentum(psi_r, psi_im):
         psi_im_i = psi_im[:,i]
         exp_mom[i] = np.sum(-1j*hbar*(psi_r_i - 1j*psi_im_i)*(np.roll(psi_r_i, -1) - psi_r_i + 1j*(np.roll(psi_im_i, -1) - psi_im_i)))
     """
-    return exp_mom
+    return exp_mom + exp_mom_2
 
 def expectation_value_kinetic_energy(psi_r, psi_im, a):
     #exp_kin = -hbar**2/(2*m)*np.sum((psi_r - 1j*psi_im)*(np.roll(psi_r,1,1)+np.roll(psi_r,-1,1)-2*psi_r + 1j*(np.roll(psi_im,1,1)+np.roll(psi_im,-1,1)-2*psi_im)),0)/delta_y
     exp_kin = -hbar**2/(2*m)*np.sum((psi_r - 1j*psi_im)*(np.roll(psi_r,1,0)+np.roll(psi_r,-1,0)-2*psi_r + 1j*(np.roll(psi_im,1,0)+np.roll(psi_im,-1,0)-2*psi_im)),0)/delta_y
-    exp_kin_2 = 1j*hbar*q/m*a*np.sum((psi_r-1j*psi_im)*(psi_r+1j*psi_im - np.roll(psi_r+1j*psi_im, 1, 0)),0)
+    exp_kin_2 = -1j*hbar*q/m*a*np.sum((psi_r-1j*psi_im)*(psi_r+1j*psi_im - np.roll(psi_r+1j*psi_im, 1, 0)),0)
     exp_kin_3 = q**2/(2*m)*a**2
+
     """
     exp_kin = np.zeros(n_t)
     for i in range(n_t):
@@ -421,7 +423,7 @@ def expectation_value_kinetic_energy(psi_r, psi_im, a):
         psi_im_i = psi_im[:,i]
         exp_kin[i] = -hbar**2/(2*m)*np.sum((psi_r_i - 1j*psi_im_i)*(np.roll(psi_r_i,1)+np.roll(psi_r_i,-1)-2*psi_r_i + 1j*(np.roll(psi_im_i,1)+np.roll(psi_im_i,-1)-2*psi_im_i)))/delta_y
     """
-    return exp_kin - exp_kin_2 + exp_kin_3
+    return exp_kin + exp_kin_2 + exp_kin_3
 
 def expectation_value_potential_energy(psi_r, psi_im):
     V = potential_diag()
@@ -530,7 +532,7 @@ print('started with kinetic energy')
 exp_kin =  expectation_value_kinetic_energy(psi_r, psi_im, a_list)
 
 pos = expectation_value_position(psi_r, psi_im, y_axis)
-mom = expectation_value_momentum(psi_r, psi_im)
+mom = expectation_value_momentum(psi_r, psi_im, a_list)
 
 
 """
@@ -547,6 +549,7 @@ plt.ylabel('Energy [J]')
 plt.legend()
 plt.show()
 
+
 plt.plot([i*delta_t/10**(-9) for i in range(safe_points)], pos)
 plt.title('expectation value of the position')
 #plt.xlabel(r'$$ \<X\> [m] $$')
@@ -559,9 +562,10 @@ plt.plot([i*delta_t/10**(-9) for i in range(safe_points)], mom)
 plt.title('expectation value of the momentum')
 #plt.xlabel(r'$$ \<P\> [kg m/s] $$')
 plt.xlabel('P')
-plt.ylabel('Energy [J]')
+plt.ylabel('Energy 1 [J]')
 plt.legend()
 plt.show()
+
 
 
 
