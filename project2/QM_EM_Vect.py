@@ -34,7 +34,7 @@ delta_x = 1*10**(-6) # grid size in the x-direction in meter
 delta_y = 0.5*10**(-9) # grid size in the y-direction in meter
 n_y = int(L_y/delta_y) + 1 # Number of y grid cells
 n_x = int(L_x/delta_x) + 1 # Number of x grid cells
-t_sim = 10**(-12)*2/3 # Total simulated time in seconds
+t_sim = 10**(-12) # Total simulated time in seconds
 #provide location of structure through boundary of y-domain
 y_start = -L_y/2
 Courant = 1 # Courant number
@@ -193,11 +193,12 @@ def run(coupling):
     A = update_matrix()
     V,H_int = harmonic_potential_and_length()
     V_diag = potential_diag()
-
+    
+    a_list = np.zeros(safe_points)
+    a = 0
     if gauge == 'velocity':
         A_vel, B_vel = update_matrix_velocity()
         E0 = 1
-        a = 0
         """
         B_plus = sparse_identity(n_y) + q*E0*delta_t/(24*m*omega_EM*delta_y)*B_vel
         B_min = sparse_identity(n_y) - q*E0*delta_t/(24*m*omega_EM*delta_y)*B_vel
@@ -222,7 +223,6 @@ def run(coupling):
     if gauge == 'velocity':
         a_squared_int = 0
         a_squared_integral_list = np.zeros(safe_points)
-        a_list = np.zeros(safe_points)
 
     ey_new = np.zeros(n_x)
     hz_new = np.zeros(n_x)
@@ -348,16 +348,17 @@ def run(coupling):
         if i % safe_frequency == 0:
             ey[:,i//safe_frequency] = ey_new
             hz[:,i//safe_frequency] = hz_new
-            if 0 == 0:
+            if gauge == 'velocity':
                 psi_L = np.exp(-1j*q**2/(2*m*hbar)*a_squared_int)*(psi_r_new + 1j*psi_im_new)
                 psi_r[:,i//safe_frequency] = psi_L.real
                 psi_im[:,i//safe_frequency] = psi_L.imag
+                a_list[i//safe_frequency] = a
+                a_squared_integral_list[i//safe_frequency] = a_squared_int
             else:
                 psi_r[:,i//safe_frequency] = psi_r_new
                 psi_im[:,i//safe_frequency] = psi_im_new 
                 a_list[i//safe_frequency] = a
             psi_squared[:,i//safe_frequency] = (psi_r_new)**2 + (psi_im_new)**2
-            a_squared_integral_list[i//safe_frequency] = a_squared_int
 
         if i % 1000 == 0:
             psi_squared_cut[:,i//1000] = (psi_r_new)**2 + (psi_im_new)**2
@@ -383,6 +384,12 @@ def Exciting_PW(arg,i):
         print('Invalid source')
 
 def expectation_value_position(psi_r, psi_im, y_axis):
+    print('pos')
+    print(psi_r)
+    np.shape(psi_im)
+    np.shape(y_axis)
+    print(delta_y)
+    y_axis = np.transpose(np.array([y_axis for t in range(safe_points)]))
     exp_pos = np.sum((psi_r**2 + psi_im**2) * y_axis * delta_y,0)
     """
     exp_pos = np.zeros(n_t)
@@ -392,7 +399,7 @@ def expectation_value_position(psi_r, psi_im, y_axis):
     return exp_pos
 
 def expectation_value_momentum(psi_r, psi_im):
-    exp_mom = np.sum(-1j*hbar*(psi_r - 1j*psi_im)*(np.roll(psi_r, -1,1) - psi_r + 1j*(np.roll(psi_im, -1,1) - psi_im)),0)
+    exp_mom = np.sum(-1j*hbar*(psi_r - 1j*psi_im)*(np.roll(psi_r, -1,0) - psi_r + 1j*(np.roll(psi_im, -1,0) - psi_im)),0)
     """
     exp_mom = np.zeros(n_t)
     for i in range(n_t):
@@ -406,6 +413,7 @@ def expectation_value_kinetic_energy(psi_r, psi_im, a):
     #exp_kin = -hbar**2/(2*m)*np.sum((psi_r - 1j*psi_im)*(np.roll(psi_r,1,1)+np.roll(psi_r,-1,1)-2*psi_r + 1j*(np.roll(psi_im,1,1)+np.roll(psi_im,-1,1)-2*psi_im)),0)/delta_y
     exp_kin = -hbar**2/(2*m)*np.sum((psi_r - 1j*psi_im)*(np.roll(psi_r,1,0)+np.roll(psi_r,-1,0)-2*psi_r + 1j*(np.roll(psi_im,1,0)+np.roll(psi_im,-1,0)-2*psi_im)),0)/delta_y
     exp_kin_2 = 1j*hbar*q/m*a*np.sum((psi_r-1j*psi_im)*(psi_r+1j*psi_im - np.roll(psi_r+1j*psi_im, 1, 0)),0)
+    exp_kin_3 = q**2/(2*m)*a**2
     """
     exp_kin = np.zeros(n_t)
     for i in range(n_t):
@@ -413,7 +421,7 @@ def expectation_value_kinetic_energy(psi_r, psi_im, a):
         psi_im_i = psi_im[:,i]
         exp_kin[i] = -hbar**2/(2*m)*np.sum((psi_r_i - 1j*psi_im_i)*(np.roll(psi_r_i,1)+np.roll(psi_r_i,-1)-2*psi_r_i + 1j*(np.roll(psi_im_i,1)+np.roll(psi_im_i,-1)-2*psi_im_i)))/delta_y
     """
-    return exp_kin + exp_kin_2
+    return exp_kin - exp_kin_2 + exp_kin_3
 
 def expectation_value_potential_energy(psi_r, psi_im):
     V = potential_diag()
@@ -521,6 +529,9 @@ exp_pot =  expectation_value_potential_energy(psi_r, psi_im)
 print('started with kinetic energy')
 exp_kin =  expectation_value_kinetic_energy(psi_r, psi_im, a_list)
 
+pos = expectation_value_position(psi_r, psi_im, y_axis)
+mom = expectation_value_momentum(psi_r, psi_im)
+
 
 """
 print(exp_energy[200:210])
@@ -535,6 +546,25 @@ plt.xlabel('Time [ns]')
 plt.ylabel('Energy [J]')
 plt.legend()
 plt.show()
+
+plt.plot([i*delta_t/10**(-9) for i in range(safe_points)], pos)
+plt.title('expectation value of the position')
+#plt.xlabel(r'$$ \<X\> [m] $$')
+plt.xlabel('X')
+plt.ylabel('Energy [J]')
+plt.legend()
+plt.show()
+
+plt.plot([i*delta_t/10**(-9) for i in range(safe_points)], mom)
+plt.title('expectation value of the momentum')
+#plt.xlabel(r'$$ \<P\> [kg m/s] $$')
+plt.xlabel('P')
+plt.ylabel('Energy [J]')
+plt.legend()
+plt.show()
+
+
+
 
 plt.imshow(psi_squared_cut)
 plt.title('Probability of the wave')
