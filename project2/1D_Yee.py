@@ -108,6 +108,14 @@ x_axis = np.linspace(0, (n_x-1)*delta_x,n_x)
 #initialize both real and imaginary parts of the wave function psi. In case alpha is not real, the initialization needs to be adapted.
 alpha_y = 0
 
+t0_gauss = t0//delta_t
+sigma_gauss = sigma_t//delta_t
+print(t0_gauss)
+print(sigma_gauss)
+"""
+t0_gauss = 12000
+sigma_gauss = 5000
+"""
 source = 'sine' # should be either 'gaussian' or 'sine'
 
 x_place_qd = L_x/4 # place of the quantum dot
@@ -202,8 +210,8 @@ def run(coupling):
     A = update_matrix()
     V,H_int = harmonic_potential_and_length()
 
-    ey_old = np.zeros(n_x)
-    hz_old = np.zeros(n_x)
+    ey_new = np.zeros(n_x)
+    hz_new = np.zeros(n_x)
 
     """
     for i in range(n_y):
@@ -213,6 +221,9 @@ def run(coupling):
     """
 
     for i in range(1,n_t):
+        ey_old = ey_new
+        hz_old = hz_new
+
         hz_new = hz_old - delta_t/(mu*delta_x)*(ey_old - np.roll(ey_old, 1))
 
         sigma = 250
@@ -224,8 +235,6 @@ def run(coupling):
             J0 = 0
         """
         J0 = 10**(17)*1.3
-        t0_gauss = 100000
-        sigma_gauss = 15000
         sigma_ramping = 100000
 
         """
@@ -242,6 +251,7 @@ def run(coupling):
         j_q = 0
         #ey_new = ey_old - delta_t/(epsilon*delta_x) * (np.roll(hz_old, -1) - hz_old) - (delta_t/epsilon)*Jy
         
+
         if source == 'gaussian':
             if i > t0_gauss - 5*sigma_gauss and i < t0_gauss + 5*sigma_gauss:
                 ey_new[n_x//3] = Eg_0*np.exp(-(i-t0_gauss)**2/(2*sigma_gauss**2))
@@ -251,13 +261,12 @@ def run(coupling):
             t0 = 30000
             sigma_ramping = 5000
             # ey_new[n_x//3] += Es_0*np.sin(omega_EM*i*delta_t)
-            Jy[n_x//2] = J0*np.sin(omega_EM*i*delta_t)*np.tanh((i*delta_t-t0)/sigma_t)
+            ey_new[n_x//3] = J0*np.sin(omega_EM*i*delta_t)*np.tanh((i*delta_t-t0)/sigma_t)
 
         else:
             print('wrong source')
 
         ey_new = ey_old - delta_t/(epsilon*delta_x) * (np.roll(hz_new, -1) - hz_new) - (delta_t/epsilon)*Jy - delta_t*L_x_size_quantum_dot/(epsilon*delta_x)*j_q
-
 
         S = c*delta_t/delta_x
         ey_new[0] = ey_old[1] + (1-S)/(1+S)*(ey_old[0]-ey_new[1])
@@ -265,8 +274,6 @@ def run(coupling):
 
         ey[:,i] = ey_new
         hz[:,i] = hz_new
-        ey_old = ey_new
-        hz_old = hz_new
 
         if i%1000 == 0:
             print(f'Done iteration {i} of {n_t}')
