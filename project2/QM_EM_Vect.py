@@ -567,9 +567,6 @@ plt.legend()
 plt.show()
 
 
-
-
-
 plt.imshow(psi_squared_cut)
 plt.title('Probability of the wave')
 plt.xlabel('Time [iteration]')
