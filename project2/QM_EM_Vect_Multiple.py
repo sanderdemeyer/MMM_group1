@@ -36,7 +36,7 @@ delta_x = 1*10**(-6) # grid size in the x-direction in meter
 delta_y = 0.5*10**(-9) # grid size in the y-direction in meter
 n_y = int(L_y/delta_y) + 1 # Number of y grid cells
 n_x = int(L_x/delta_x) + 1 # Number of x grid cells
-t_sim = 10**(-12)/30 # Total simulated time in seconds
+t_sim = 10**(-12) # Total simulated time in seconds
 #provide location of structure through boundary of y-domain
 y_start = -L_y/2
 Courant = 1 # Courant number
@@ -47,7 +47,7 @@ x_axis = np.linspace(0, (n_x-1)*delta_x,n_x)
 #initialize both real and imaginary parts of the wave function psi. In case alpha is not real, the initialization needs to be adapted.
 alpha_y = 0
 
-n_sheets = 1 # The number of wanted sheets of quantum dots
+n_sheets = 2 # The number of wanted sheets of quantum dots
 
 
 t0_gauss = t0//delta_t
