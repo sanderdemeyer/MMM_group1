@@ -36,7 +36,7 @@ delta_x = 1*10**(-6) # grid size in the x-direction in meter
 delta_y = 0.5*10**(-9) # grid size in the y-direction in meter
 n_y = int(L_y/delta_y) + 1 # Number of y grid cells
 n_x = int(L_x/delta_x) + 1 # Number of x grid cells
-t_sim = 10**(-12) # Total simulated time in seconds
+t_sim = 10**(-12)/3 # Total simulated time in seconds
 #provide location of structure through boundary of y-domain
 y_start = -L_y/2
 Courant = 1 # Courant number
@@ -321,7 +321,7 @@ def run(coupling):
                     j_q = np.zeros(n_x)
                     j_q[x_qd] = q*hbar*N*L_x_size_quantum_dot/(2*m*delta_x)*np.mean(psi_r_new*np.roll(psi_im_new+psi_im_old,-1) - np.roll(psi_r_new,-1)*(psi_im_new+psi_im_old))
 
-                    ey_new = ey_old - delta_t/(epsilon*delta_x) * (np.roll(hz_new, -1) - hz_new) - (delta_t/epsilon)*Jy - delta_t/epsilon*j_q
+                    ey_new = ey_old - delta_t/(epsilon*delta_x) * (np.roll(hz_new, -1) - hz_new) - (delta_t/epsilon)*(Jy+j_q)
                     #ey_new = ey_old - delta_t/(epsilon*delta_x) * (np.roll(hz_new, -1) - hz_new) - (delta_t/epsilon)*Jy - delta_t*L_x_size_quantum_dot/(epsilon*delta_x)*j_q
                     a += -ey_new[x_qd]*delta_t
             a_squared_int += a**2*delta_t

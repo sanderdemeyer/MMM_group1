@@ -36,7 +36,7 @@ delta_x = 1*10**(-6) # grid size in the x-direction in meter
 delta_y = 0.5*10**(-9) # grid size in the y-direction in meter
 n_y = int(L_y/delta_y) + 1 # Number of y grid cells
 n_x = int(L_x/delta_x) + 1 # Number of x grid cells
-t_sim = 10**(-12)/50 # Total simulated time in seconds
+t_sim = 10**(-12)/30 # Total simulated time in seconds
 #provide location of structure through boundary of y-domain
 y_start = -L_y/2
 Courant = 1 # Courant number
@@ -47,7 +47,7 @@ x_axis = np.linspace(0, (n_x-1)*delta_x,n_x)
 #initialize both real and imaginary parts of the wave function psi. In case alpha is not real, the initialization needs to be adapted.
 alpha_y = 0
 
-n_sheets = 3 # The number of wanted sheets of quantum dots
+n_sheets = 1 # The number of wanted sheets of quantum dots
 
 
 t0_gauss = t0//delta_t
@@ -73,8 +73,8 @@ starting_n_point = [n_y//8 + sheet*n_y//24 for sheet in range(n_sheets)]
 print(f'Zero-point energy is {omega_HO*hbar/2}')
 
 coupling = True
-back_coupling = False
-gauge = 'length'
+back_coupling = True
+gauge = 'velocity'
 
 norm_every_step = False
 
@@ -255,6 +255,8 @@ def run(coupling):
         elif source == 'sine':
             Jy[n_x//3] = -5308.993524411968*Es_0*np.sin(omega_EM*i*delta_t)*(1+np.tanh((i*delta_t-t0)/sigma_ramping))/2
             #ey_new[int(n_x*1.3/3)] = 0
+        elif source == 'None':
+            pass
         else:
             print('wrong source')
 
@@ -299,8 +301,6 @@ def run(coupling):
             else:
                 if back_coupling == False:
                     ey_new = ey_old - delta_t/(epsilon*delta_x) * (np.roll(hz_new, -1) - hz_new) - (delta_t/epsilon)*Jy
-                    for sheet in range(n_sheets):
-                        a[sheet] += -ey_old[x_qd[sheet]]*delta_t
 
                     """
                     B_plus = sparse_identity(n_y) - q*a*delta_t/(24*m*delta_y)*B_vel
@@ -312,6 +312,8 @@ def run(coupling):
                     psi_im_new = B_min_inv @ (-A_plus @ psi_r_new + B_min @ psi_im_old)
                     """
                     for sheet in range(n_sheets):
+                        a[sheet] += -ey_old[x_qd[sheet]]*delta_t
+
                         B_plus = sparse_identity(n_y) + a[sheet]*B_matrix
                         B_min = sparse_identity(n_y) - a[sheet]*B_matrix
 
@@ -319,19 +321,20 @@ def run(coupling):
                         #psi_im_new = spsolve(B_min, -A_plus @ psi_r_new + B_min @ psi_im_old)
                         psi_im_new[:,sheet] = spsolve(B_plus, -A_plus @ psi_r_new[:,sheet] + B_min @ psi_im_old[:,sheet])
                 else:
-                    B_plus = sparse_identity(n_y) + q*a*delta_t/(24*m*delta_y)*B_vel
-                    B_min = sparse_identity(n_y) - q*a*delta_t/(24*m*delta_y)*B_vel
-
-                    psi_r_new = spsolve(B_plus, A_plus @ psi_im_old + B_min @ psi_r_old)
-                    #psi_im_new = spsolve(B_min, -A_plus @ psi_r_new + B_min @ psi_im_old)
-                    psi_im_new = spsolve(B_plus, -A_plus @ psi_r_new + B_min @ psi_im_old)
-
                     j_q = np.zeros(n_x)
-                    j_q[x_qd] = q*hbar*N*L_x_size_quantum_dot/(2*m*delta_x)*np.mean(psi_r_new*np.roll(psi_im_new+psi_im_old,-1) - np.roll(psi_r_new,-1)*(psi_im_new+psi_im_old))
+                    for sheet in range(n_sheets):
+                        B_plus = sparse_identity(n_y) + q*a[sheet]*delta_t/(24*m*delta_y)*B_vel
+                        B_min = sparse_identity(n_y) - q*a[sheet]*delta_t/(24*m*delta_y)*B_vel
 
-                    ey_new = ey_old - delta_t/(epsilon*delta_x) * (np.roll(hz_new, -1) - hz_new) - (delta_t/epsilon)*Jy - delta_t/epsilon*j_q
-                    #ey_new = ey_old - delta_t/(epsilon*delta_x) * (np.roll(hz_new, -1) - hz_new) - (delta_t/epsilon)*Jy - delta_t*L_x_size_quantum_dot/(epsilon*delta_x)*j_q
-                    a += -ey_new[x_qd]*delta_t
+                        psi_r_new[:,sheet] = spsolve(B_plus, A_plus @ psi_im_old[:,sheet] + B_min @ psi_r_old[:,sheet])
+                        #psi_im_new = spsolve(B_min, -A_plus @ psi_r_new + B_min @ psi_im_old)
+                        psi_im_new[:,sheet] = spsolve(B_plus, -A_plus @ psi_r_new[:,sheet] + B_min @ psi_im_old[:,sheet])
+
+                        j_q[x_qd[sheet]] = q*hbar*N*L_x_size_quantum_dot/(2*m*delta_x)*np.mean(psi_r_new[:,sheet]*np.roll(psi_im_new[:,sheet]+psi_im_old[:,sheet],-1) - np.roll(psi_r_new[:,sheet],-1)*(psi_im_new[:,sheet]+psi_im_old[:,sheet]))
+
+                    ey_new = ey_old - delta_t/(epsilon*delta_x) * (np.roll(hz_new, -1) - hz_new) - (delta_t/epsilon)*(Jy+j_q)
+                    for sheet in range(n_sheets):
+                        a[sheet] += -ey_new[x_qd[sheet]]*delta_t
             a_squared_int += a**2*delta_t
 
         if norm_every_step:
