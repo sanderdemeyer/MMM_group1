@@ -24,7 +24,9 @@ N = 9*10**(27)
 omega_HO = 10*10**(12) # frequency of the HO
 Eg_0 = 5*10**6 # Amplitude of the PW-pulse if it is Gaussian
 Es_0 = 1*10**5 # Amplitude of the PW-pulse if it is a sine wave
-sigma_t = 10*10**(-15) # Width of the gaussian pulse
+f = 2 # factor by which the 'normal' width of the gaussian pulse is normalized
+sigma_t = 10*10**(-15)*f # Width of the gaussian pulse
+sigma_ramping = 30*10**(-15)
 t0 = 20*10**(-15)*5 # Center of the gaussian pulse
 
 alpha = 1 #should be between 0.9 and 1.1
@@ -65,8 +67,8 @@ x_qd = int(x_place_qd/delta_x) # y-coordinate of the quantum dot
 
 
 def run():
-    ey = np.zeros((n_x, n_t))
-    hz = np.zeros((n_x, n_t))
+    ey = np.zeros((n_x, safe_points))
+    hz = np.zeros((n_x, safe_points))
 
     ey_new = np.zeros(n_x)
     hz_new = np.zeros(n_x)
@@ -81,11 +83,14 @@ def run():
         if source == 'gaussian':
             if i > t0_gauss - 5*sigma_gauss and i < t0_gauss + 5*sigma_gauss:
                 #ey_new[n_x//3] = Eg_0*np.exp(-(i-t0_gauss)**2/(2*sigma_gauss**2))
-                Jy[n_x//3] = Eg_0*np.exp(-(i-t0_gauss)**2/(2*sigma_gauss**2))
+                Jy[n_x//3] = -1110.6833660953741*np.sqrt(1/f)*Eg_0*np.exp(-(i-t0_gauss)**2/(2*sigma_gauss**2))
+                #Jy[n_x//2] = -1110.6833660953741*np.sqrt(3/f)*Eg_0/np.sqrt(f)*np.exp(-(i-t0_gauss)**2/(2*sigma_gauss**2))
             else:
                 pass
         elif source == 'sine':
-            ey_new[n_x//3] = Es_0*np.sin(omega_EM*i*delta_t)*np.tanh((i*delta_t-t0)/sigma_t)
+            Jy[n_x//3] = -5308.993524411968*Es_0*np.sin(omega_EM*i*delta_t)*(1+np.tanh((i*delta_t-t0)/sigma_ramping))/2
+            Jy[n_x//2] = -5308.993524411968*Es_0*np.sin(omega_EM*i*delta_t)*(1+np.tanh((i*delta_t-t0)/sigma_ramping))/2
+            #ey_new[n_x//3] = Es_0*np.sin(omega_EM*i*delta_t)*np.tanh((i*delta_t-t0)/sigma_ramping)
         else:
             #print('wrong source')
             pass        
@@ -111,6 +116,10 @@ ey,hz = run()
 animation_speed = 7500//safe_frequency
 
 animation_speed = 7500//safe_frequency
+
+maximum = np.max(np.abs(ey[:,280]))
+print(f'max is {maximum}')
+print(f'should be {1123.0356172173870176477172221528*10**6/maximum}')
 
 fig, ax = plt.subplots()
 ax.set_xlabel('x position [m]')
