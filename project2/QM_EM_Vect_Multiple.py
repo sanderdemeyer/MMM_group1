@@ -8,6 +8,7 @@ from scipy.sparse.linalg import inv as sparse_inv
 from scipy.sparse.linalg import spsolve
 from scipy.sparse import identity as sparse_identity
 import time
+from scipy.optimize import curve_fit
 
 #define (fundamental) constants : hbar,massas,lenghts
 hbar = constants.hbar
@@ -22,12 +23,12 @@ L_y = 100*10**(-9) # Length in the y-direction in meter
 L_x_size_quantum_dot = 0.5*10**(-9)
 N = 9*10**(27)
 omega_HO = 10*10**(12) # frequency of the HO
-Eg_0 = 5*10**6 # Amplitude of the PW-pulse if it is Gaussian
-Es_0 = 1*10**5 # Amplitude of the PW-pulse if it is a sine wave
 f = 2 # factor by which the 'normal' width of the gaussian pulse is normalized
+Eg_0 = 5*10**6*np.sqrt(f) # Amplitude of the PW-pulse if it is Gaussian
+Es_0 = 1*10**5 # Amplitude of the PW-pulse if it is a sine wave
 sigma_t = 10*10**(-15)*f # Width of the gaussian pulse
 sigma_ramping = 30*10**(-15)
-t0 = 20*10**(-15)*5 # Center of the gaussian pulse
+t0 = 20*10**(-15)*15 # Center of the gaussian pulse
 
 alpha = 1 #should be between 0.9 and 1.1
 omega_EM = alpha*omega_HO
@@ -36,7 +37,7 @@ delta_x = 1*10**(-6) # grid size in the x-direction in meter
 delta_y = 0.5*10**(-9) # grid size in the y-direction in meter
 n_y = int(L_y/delta_y) + 1 # Number of y grid cells
 n_x = int(L_x/delta_x) + 1 # Number of x grid cells
-t_sim = 10**(-12) # Total simulated time in seconds
+t_sim = 10**(-12)*20 # Total simulated time in seconds
 #provide location of structure through boundary of y-domain
 y_start = -L_y/2
 Courant = 1 # Courant number
@@ -47,16 +48,17 @@ x_axis = np.linspace(0, (n_x-1)*delta_x,n_x)
 #initialize both real and imaginary parts of the wave function psi. In case alpha is not real, the initialization needs to be adapted.
 alpha_y = 0
 
-n_sheets = 2 # The number of wanted sheets of quantum dots
+n_sheets = 3 # The number of wanted sheets of quantum dots
 
 
-t0_gauss = t0//delta_t
-sigma_gauss = sigma_t//delta_t
+t0_gauss = t0//delta_t # Convert t0 to iteration number
+sigma_gauss = sigma_t//delta_t # Convert sigma_gauss to iteration number
 
-safe_frequency = 1000
-safe_points = n_t//safe_frequency+1
+safe_frequency = 2000 # All values are saved after this amount of time steps (except Norm, this is saved at all time steps)
+safe_points = n_t//safe_frequency+1 # Denotes how many times the variables will be saved.
 
-source = 'gaussian' # should be either 'gaussian' or 'sine'
+source = 'None' # Type of EM wave. This should be either 'gaussian' or 'sine'
+source_location = int(5*n_x/12) # Position of the source in the x-direction
 
 """
 if source == 'gaussian':
@@ -64,19 +66,24 @@ if source == 'gaussian':
     sigma_gauss = sigma_t//delta_t
     t0_gauss = t0//delta_t
 """
-x_place_qd = [(sheet+1)*L_x/(n_sheets+1) for sheet in range(n_sheets)] # place of the quantum dot
+x_place_qd = [(sheet+1)*L_x/(n_sheets+1) for sheet in range(n_sheets)] # place of the quantum dots
+x_place_qd = [450*delta_x, 500*delta_x, 550*delta_x]
 assert(len(x_place_qd) == n_sheets, 'Length of x_place_qd should be equal to n_sheets')
-x_qd = [int(x_place_qd[sheet]/delta_x) for sheet in range(n_sheets)] # y-coordinate of the quantum dot
+x_qd = [int(x_place_qd[sheet]/delta_x) for sheet in range(n_sheets)] # y-coordinate of the quantum dots
+#x_qd = [450, 500, 550] # y-coordinate of the quantum dots
 
-starting_n_point = [n_y//8 + sheet*n_y//24 for sheet in range(n_sheets)]
+starting_n_point = [(n_y//4 + sheet*n_y//24) for sheet in range(n_sheets)] # starting points of the quantum dots
+starting_n_point = [0, n_y//4, 0]
+
+assert(len(starting_n_point) == n_sheets, 'Length of x_place_qd should be equal to n_sheets')
 
 print(f'Zero-point energy is {omega_HO*hbar/2}')
 
-coupling = True
-back_coupling = True
-gauge = 'velocity'
+coupling = True # Whether there is EM --> QM coupling
+back_coupling = True # Whether there is QM --> EM coupling. This can only be True if coupling == True
+gauge = 'length' # The gauge that will be used. This should be either 'length' or 'gauge'
 
-norm_every_step = False
+norm_every_step = False # Denotes whether the wavefunction is normalized at every time step. Default is False.
 
 def update_matrix():
     A = np.zeros((n_y,n_y))
@@ -222,6 +229,7 @@ def run(coupling):
 
     for sheet in range(n_sheets):
         psi_r_new[:,sheet] = (m*omega_HO/(constants.pi*hbar))**(1/4)*np.exp(-m*omega_HO/2/hbar*(y_axis - starting_n_point[sheet]*delta_y)**2)
+        psi_im_new[:,sheet] = np.zeros(n_y)
 
     psi_r[:,0,:] = psi_r_new
     psi_im[:,0,:] = psi_im_new
@@ -247,13 +255,13 @@ def run(coupling):
         Jy = np.zeros(n_x)
         if source == 'gaussian':
             if i > t0_gauss - 5*sigma_gauss and i < t0_gauss + 5*sigma_gauss:
-                Jy[n_x//3] = -1110.6833660953741*np.sqrt(1/f)*Eg_0*np.exp(-(i-t0_gauss)**2/(2*sigma_gauss**2))
+                Jy[source_location] = -1110.6833660953741*np.sqrt(1/f)*Eg_0*np.exp(-(i-t0_gauss)**2/(2*sigma_gauss**2))
                 #ey_new[int(n_x*1.3/3)] = Eg_0*np.exp(-(i-t0_gauss)**2/(2*sigma_gauss**2))
             else:
                 pass
                 #ey_new[n_x//3] = 0
         elif source == 'sine':
-            Jy[n_x//3] = -5308.993524411968*Es_0*np.sin(omega_EM*i*delta_t)*(1+np.tanh((i*delta_t-t0)/sigma_ramping))/2
+            Jy[source_location] = -5308.993524411968*Es_0*np.sin(omega_EM*i*delta_t)*(1+np.tanh((i*delta_t-t0)/sigma_ramping))/2
             #ey_new[int(n_x*1.3/3)] = 0
         elif source == 'None':
             pass
@@ -262,9 +270,9 @@ def run(coupling):
 
         if gauge == 'length':
             if coupling == False:
-                for sheet in n_sheets:
+                for sheet in range(n_sheets):
                     psi_r_new[:,sheet] = psi_r_old[:,sheet] - hbar*delta_t*(A @ psi_im_old[:,sheet])/(24*m*(delta_y**2)) + delta_t*(V @ psi_im_old[:,sheet])/hbar
-                    psi_im_new = psi_im_old[:,sheet] + hbar*delta_t/24/(m*delta_y**2)*(A @ psi_r_new[:,sheet]) - delta_t/hbar*(V @ psi_r_new[:,sheet])
+                    psi_im_new[:,sheet] = psi_im_old[:,sheet] + hbar*delta_t/24/(m*delta_y**2)*(A @ psi_r_new[:,sheet]) - delta_t/hbar*(V @ psi_r_new[:,sheet])
                 ey_new = ey_old - delta_t/(epsilon*delta_x) * (np.roll(hz_new, -1) - hz_new) - (delta_t/epsilon)*Jy
             else:
                 if back_coupling == False:
@@ -518,6 +526,7 @@ plt.ylabel('Norm')
 plt.legend()
 plt.show()
 
+
 """
 exp_pos = expectation_value_position(psi_r, psi_im, y_axis)
 plt.plot([i for i in range(n_t)], exp_pos)
@@ -544,24 +553,44 @@ exp_kin =  expectation_value_kinetic_energy(psi_r, psi_im, a_list)
 pos = expectation_value_position(psi_r, psi_im, y_axis)
 mom = expectation_value_momentum(psi_r, psi_im, a_list)
 
-
-"""
-print(exp_energy[200:210])
-print(exp_pot[200:210])
-print(exp_kin[200:210])
-"""
 for sheet in range(n_sheets):
     plt.plot([i*safe_frequency*delta_t/10**(-15) for i in range(safe_points-2)], exp_energy[:,sheet], label = 'energy')
     plt.plot([i*safe_frequency*delta_t/10**(-15) for i in range(safe_points)], exp_pot[:,sheet], label = 'potential energy')
     plt.plot([i*safe_frequency*delta_t/10**(-15) for i in range(safe_points)], exp_kin[:,sheet], label = 'kinetic energy')
+    plt.title(f'expectation value of the energy of quantum sheet {sheet}', fontsize = 15)
+    plt.xlabel('Time [fs]', fontsize = 15)
+    plt.ylabel('Energy [J]', fontsize = 15)
+    plt.legend()
+    plt.show()
+
+
+"""
+# Fitting of the exponential
+
+def exponential(x, y0, a, b):
+    return y0 + a*np.exp(-b*x)
+
+curve_fit_x = [i*safe_frequency*delta_t/10**(-15) for i in range(safe_points-2)]
+params, cov = curve_fit(exponential, curve_fit_x, exp_energy[:,0], p0 = [5.7*10**(-22), 4.35*10**(-21), 6.3*10**(-4)])
+print(f'params are {params}')
+print(f'cov is {cov}')
+
+for sheet in range(n_sheets):
+    plt.plot([i*safe_frequency*delta_t/10**(-15) for i in range(safe_points-2)], exp_energy[:,sheet], label = 'energy')
+    plt.plot([i*safe_frequency*delta_t/10**(-15) for i in range(safe_points)], exp_pot[:,sheet], label = 'potential energy')
+    plt.plot([i*safe_frequency*delta_t/10**(-15) for i in range(safe_points)], exp_kin[:,sheet], label = 'kinetic energy')
+    plt.plot(curve_fit_x, [exponential(x, params[0], params[1], params[2]) for x in curve_fit_x], label = 'fitted energy')
     plt.title(f'expectation value of the energy of quantum sheet {sheet}')
     plt.xlabel('Time [fs]')
     plt.ylabel('Energy [J]')
     plt.legend()
     plt.show()
 
+"""
 
-plt.plot([i*safe_frequency*delta_t/10**(-15) for i in range(safe_points)], pos, label = ['quantum sheet' + str(i) for i in range(n_sheets)])
+
+
+plt.plot([i*safe_frequency*delta_t/10**(-15) for i in range(safe_points)], pos, label = ['quantum sheet ' + str(i) for i in range(n_sheets)])
 plt.title('expectation value of the position')
 #plt.xlabel(r'$$ \<X\> [m] $$')
 plt.xlabel('Time [fs]')
@@ -569,7 +598,7 @@ plt.ylabel('X [m]')
 plt.legend()
 plt.show()
 
-plt.plot([i*safe_frequency*delta_t/10**(-15) for i in range(safe_points)], mom, label = ['quantum sheet' + str(i) for i in range(n_sheets)])
+plt.plot([i*safe_frequency*delta_t/10**(-15) for i in range(safe_points)], mom, label = ['quantum sheet ' + str(i) for i in range(n_sheets)])
 plt.title('expectation value of the momentum')
 #plt.xlabel(r'$$ \<P\> [kg m/s] $$')
 plt.xlabel('Time [fs]')
@@ -579,10 +608,10 @@ plt.show()
 
 
 for sheet in range(n_sheets):
-    plt.imshow(psi_squared_cut[:,:,sheet], extent=[0,int(t_sim*10**(15)),int(L_y*10**(9)),0])
-    plt.title(f'Probability of wave in quantum sheet {sheet}')
-    plt.xlabel('Time [fs]')
-    plt.ylabel('y-position [nm]')
+    plt.imshow(psi_squared_cut[:,:,sheet], extent=[0,int(t_sim*10**(15)),int(L_y*10**(9)),0], aspect='auto')
+    plt.title(f'Probability density of wave in quantum sheet {sheet}', fontsize = 15)
+    plt.xlabel('Time [fs]', fontsize = 15)
+    plt.ylabel('y-position [nm]', fontsize = 15)
     plt.show()
 
 #error = check_continuity_equation(psi_r, psi_im)
@@ -626,15 +655,19 @@ plt.show()
 animation_speed = 2500//safe_frequency
 
 fig, ax = plt.subplots()
-ax.set_xlabel('x position [m]')
+ax.set_xlabel('x position [m]', fontsize = 15)
 #ax.set_aspect('equal', adjustable='box')
 def animate(i):
     ax.clear()
-    ax.set_ylabel('ey [V/m]')
+    ax.set_ylabel('ey [V/m]', fontsize = 15)
     ax.plot(x_axis, ey[:,int(i*animation_speed)], c = 'black')
     for sheet in range(n_sheets):
         ax.axvline(x = x_place_qd[sheet], c = 'red', label = f'quantum dot {sheet}')
-    ax.set_title(f'timestep = {int(i*animation_speed*safe_frequency)}. Time = {round(delta_t/10**(-15)*i*animation_speed*safe_frequency,3)} fs')
+    ax.set_title(f'timestep = {int(i*animation_speed*safe_frequency)}. Time = {round(delta_t/10**(-15)*i*animation_speed*safe_frequency,3)} fs', fontsize = 15)
+    ax.set_xlabel('x-position [m]', fontsize = 15)
+    ax.set_ylabel('ey field [V/m]', fontsize = 15)
+    plt.legend()
+
     #ax2 = ax.twinx()
     #ax2.set_ylabel('y')
     #ax2.scatter([x_place_qd for i in range(len(y_axis))], y_axis, c = psi_r[:,int(i*animation_speed)]**2 + psi_im[:,int(i*animation_speed)]**2)
@@ -649,10 +682,10 @@ fig, ax = plt.subplots()
 #ax.set_aspect('equal', adjustable='box')
 def animate(i):
     ax.clear()
-    ax.plot(y_axis, psi_r[:,int(i*animation_speed)]**2 + psi_im[:,int(i*animation_speed)]**2, label = ['quantum sheet' + str(i) for i in range(n_sheets)])
+    ax.plot(y_axis, psi_r[:,int(i*animation_speed)]**2 + psi_im[:,int(i*animation_speed)]**2, label = ['quantum sheet ' + str(i) for i in range(n_sheets)])
     ax.set_title(f'timestep = {int(i*animation_speed*safe_frequency)}. Time = {round(delta_t/10**(-15)*i*animation_speed*safe_frequency,3)} fs')
     ax.set_xlabel('y-position [m]')
-    ax.set_ylabel('Probability')
+    ax.set_ylabel('Probability density')
     plt.legend()
 anim = FuncAnimation(fig, animate)
 plt.show()
