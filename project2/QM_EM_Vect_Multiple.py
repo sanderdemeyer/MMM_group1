@@ -37,7 +37,7 @@ delta_x = 1*10**(-6) # grid size in the x-direction in meter
 delta_y = 0.5*10**(-9) # grid size in the y-direction in meter
 n_y = int(L_y/delta_y) + 1 # Number of y grid cells
 n_x = int(L_x/delta_x) + 1 # Number of x grid cells
-t_sim = 10**(-12)*20 # Total simulated time in seconds
+t_sim = 10**(-12)*5 # Total simulated time in seconds
 #provide location of structure through boundary of y-domain
 y_start = -L_y/2
 Courant = 1 # Courant number
@@ -48,7 +48,7 @@ x_axis = np.linspace(0, (n_x-1)*delta_x,n_x)
 #initialize both real and imaginary parts of the wave function psi. In case alpha is not real, the initialization needs to be adapted.
 alpha_y = 0
 
-n_sheets = 3 # The number of wanted sheets of quantum dots
+n_sheets = 1 # The number of wanted sheets of quantum dots
 
 
 t0_gauss = t0//delta_t # Convert t0 to iteration number
@@ -57,8 +57,8 @@ sigma_gauss = sigma_t//delta_t # Convert sigma_gauss to iteration number
 safe_frequency = 2000 # All values are saved after this amount of time steps (except Norm, this is saved at all time steps)
 safe_points = n_t//safe_frequency+1 # Denotes how many times the variables will be saved.
 
-source = 'None' # Type of EM wave. This should be either 'gaussian' or 'sine'
-source_location = int(5*n_x/12) # Position of the source in the x-direction
+source = 'gaussian' # Type of EM wave. This should be either 'gaussian' or 'sine'
+source_location = int(3*n_x/12) # Position of the source in the x-direction
 
 """
 if source == 'gaussian':
@@ -67,13 +67,13 @@ if source == 'gaussian':
     t0_gauss = t0//delta_t
 """
 x_place_qd = [(sheet+1)*L_x/(n_sheets+1) for sheet in range(n_sheets)] # place of the quantum dots
-x_place_qd = [450*delta_x, 500*delta_x, 550*delta_x]
+#x_place_qd = [450*delta_x, 500*delta_x, 550*delta_x]
 assert(len(x_place_qd) == n_sheets, 'Length of x_place_qd should be equal to n_sheets')
 x_qd = [int(x_place_qd[sheet]/delta_x) for sheet in range(n_sheets)] # y-coordinate of the quantum dots
 #x_qd = [450, 500, 550] # y-coordinate of the quantum dots
 
-starting_n_point = [(n_y//4 + sheet*n_y//24) for sheet in range(n_sheets)] # starting points of the quantum dots
-starting_n_point = [0, n_y//4, 0]
+starting_n_point = [(n_y//4 + sheet*n_y//24)*0 for sheet in range(n_sheets)] # starting points of the quantum dots
+#starting_n_point = [0, n_y//4, 0]
 
 assert(len(starting_n_point) == n_sheets, 'Length of x_place_qd should be equal to n_sheets')
 
@@ -653,6 +653,10 @@ plt.show()
 """
 
 animation_speed = 2500//safe_frequency
+
+print(f'max at 300000 is {np.max(ey[:,int(int(300000/safe_frequency))])}')
+print(f'max at 1100000 is {np.max(ey[:,int(int(1100000/safe_frequency))])}')
+print(f'transmission is {np.max(ey[:,int(int(1100000/safe_frequency))])/np.max(ey[:,int(int(300000/safe_frequency))])}')
 
 fig, ax = plt.subplots()
 ax.set_xlabel('x position [m]', fontsize = 15)
