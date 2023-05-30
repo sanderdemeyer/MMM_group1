@@ -16,10 +16,10 @@ print(np.multiply(d, np.roll(d, 1, 0)))
 #0: behoud rijen, verander kolommen (voor i)
 #1: behoud kolommen, verander rijen (voor j)
 
-print((1+1151j).imag)
 
+print(np.eye(5, 5, -2))
 
-
+print(a)
 
 
 
