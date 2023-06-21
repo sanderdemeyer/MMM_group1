@@ -8,6 +8,13 @@ from scipy.sparse import identity as sparse_identity
 import time
 from scipy.optimize import curve_fit
 
+def potential_diag():
+    V = np.zeros(n_y)
+    for i in range(n_y):
+        y = y_start + i*delta_y
+        V[i] = (m/2)*(omega_HO**2)*(y**2)
+    return V
+
 #define (fundamental) constants : hbar,massas,lenghts
 hbar = constants.hbar
 m = 0.15*constants.m_e 
@@ -35,11 +42,15 @@ delta_x = 1*10**(-6) # grid size in the x-direction in meter
 delta_y = 0.5*10**(-9) # grid size in the y-direction in meter
 n_y = int(L_y/delta_y) + 1 # Number of y grid cells
 n_x = int(L_x/delta_x) + 1 # Number of x grid cells
-t_sim = 10**(-12)/30 # Total simulated time in seconds
+t_sim = 10**(-12)*2.5 # Total simulated time in seconds
 #provide location of structure through boundary of y-domain
 y_start = -L_y/2
 Courant = 1 # Courant number
-delta_t = 1/c*Courant*delta_y # time step based on the Courant number. With the current definitions, this means that delta_t = 1.6667*10**(-18)
+delta_t_EM = 1/c*Courant*delta_x # time step based on the Courant number. With the current definitions, this means that delta_t = 1.6667*10**(-18)
+Vmax = np.max(potential_diag())
+delta_t_QM = 2*Courant/(8/3*hbar/m/delta_y**2 + Vmax/hbar)
+delta_t = min(delta_t_EM, delta_t_QM)
+
 n_t = int(t_sim/delta_t) # Total number of time steps
 y_axis = np.linspace(y_start,y_start + (n_y-1)*delta_y,n_y)
 x_axis = np.linspace(0, (n_x-1)*delta_x,n_x)
@@ -53,7 +64,7 @@ sigma_gauss = sigma_t//delta_t # Convert sigma_gauss to iteration number
 safe_frequency = 1 # All values are saved after this amount of time steps (except Norm, this is saved at all time steps)
 safe_points = n_t//safe_frequency+1 # Denotes how many times the variables will be saved.
 
-source = 'None' # Type of EM wave. This should be either 'gaussian', 'sine', or 'None'
+source = 'sine' # Type of EM wave. This should be either 'gaussian', 'sine', or 'None'
 source_location = int(5*n_x/12) # Position of the source in the x-direction
 
 
@@ -63,15 +74,15 @@ x_place_qd = [(sheet+1)*L_x/(n_sheets+1) for sheet in range(n_sheets)] # place o
 x_qd = [int(x_place_qd[sheet]/delta_x) for sheet in range(n_sheets)] # y-coordinate of the quantum dots. Should have length == n_sheets
 #x_qd = [450, 500, 550] # y-coordinate of the quantum dots
 
-starting_n_point = [(n_y//4 + sheet*n_y//24) for sheet in range(n_sheets)] # starting points of the quantum dots. Should have length == n_sheets
+starting_n_point = [(n_y//4 + sheet*n_y//24)*0 for sheet in range(n_sheets)] # starting points of the quantum dots. Should have length == n_sheets
 #starting_n_point = [0, n_y//4, 0]
 
 
 print(f'Zero-point energy is {omega_HO*hbar/2}')
 
-coupling = False # Whether there is EM --> QM coupling
+coupling = True # Whether there is EM --> QM coupling
 back_coupling = False # Whether there is QM --> EM coupling. This can only be True if coupling == True
-gauge = 'length' # The gauge that will be used. This should be either 'length' or 'gauge'
+gauge = 'velocity' # The gauge that will be used. This should be either 'length' or 'gauge'
 
 norm_every_step = False # Denotes whether the wavefunction is normalized at every time step. Default is False.
 
@@ -155,12 +166,6 @@ def harmonic_potential_and_length():
     H_int.eliminate_zeros()
     return V,H_int
 
-def potential_diag():
-    V = np.zeros(n_y)
-    for i in range(n_y):
-        y = y_start + i*delta_y
-        V[i] = (m/2)*(omega_HO**2)*(y**2)
-    return V
 
 def get_H_int(a):
     H_int = np.zeros((n_y,n_y))
@@ -274,21 +279,25 @@ def run(coupling):
                     for sheet in range(n_sheets):
                         a[sheet] += -ey_old[x_qd[sheet]]*delta_t
 
-                        B_plus = sparse_identity(n_y) + a[sheet]*B_matrix
-                        B_min = sparse_identity(n_y) - a[sheet]*B_matrix
+                        # B_plus = sparse_identity(n_y) + a[sheet]*B_matrix
+                        # B_min = sparse_identity(n_y) - a[sheet]*B_matrix
+                        B_plus = sparse_identity(n_y) - a[sheet]*B_matrix
+                        B_min = sparse_identity(n_y) + a[sheet]*B_matrix
 
                         psi_r_new[:,sheet] = spsolve(B_plus, A_plus @ psi_im_old[:,sheet] + B_min @ psi_r_old[:,sheet])
                         psi_im_new[:,sheet] = spsolve(B_plus, -A_plus @ psi_r_new[:,sheet] + B_min @ psi_im_old[:,sheet])
                 else:
                     j_q = np.zeros(n_x)
                     for sheet in range(n_sheets):
-                        B_plus = sparse_identity(n_y) + q*a[sheet]*delta_t/(24*m*delta_y)*B_vel
-                        B_min = sparse_identity(n_y) - q*a[sheet]*delta_t/(24*m*delta_y)*B_vel
+                        #B_plus = sparse_identity(n_y) + q*a[sheet]*delta_t/(24*m*delta_y)*B_vel
+                        #B_min = sparse_identity(n_y) - q*a[sheet]*delta_t/(24*m*delta_y)*B_vel
+                        B_plus = sparse_identity(n_y) - q*a[sheet]*delta_t/(24*m*delta_y)*B_vel
+                        B_min = sparse_identity(n_y) + q*a[sheet]*delta_t/(24*m*delta_y)*B_vel
 
                         psi_r_new[:,sheet] = spsolve(B_plus, A_plus @ psi_im_old[:,sheet] + B_min @ psi_r_old[:,sheet])
                         psi_im_new[:,sheet] = spsolve(B_plus, -A_plus @ psi_r_new[:,sheet] + B_min @ psi_im_old[:,sheet])
-
-                        j_q[x_qd[sheet]] = -q*hbar*N*L_x_size_quantum_dot/(2*m*delta_x)*np.mean(psi_r_new[:,sheet]*np.roll(psi_im_new[:,sheet]+psi_im_old[:,sheet],-1) - np.roll(psi_r_new[:,sheet],-1)*(psi_im_new[:,sheet]+psi_im_old[:,sheet]))
+                        j_q[x_qd[sheet]] = q*hbar*N*L_x_size_quantum_dot/(2*m*delta_x)*np.mean(psi_r_new[:,sheet]*np.roll(psi_im_new[:,sheet]+psi_im_old[:,sheet],-1) - np.roll(psi_r_new[:,sheet],-1)*(psi_im_new[:,sheet]+psi_im_old[:,sheet]))
+                        j_q[x_qd[sheet]] += -(q**2*a[sheet]*N/m)*(L_x_size_quantum_dot/delta_x)
 
                     ey_new = ey_old - delta_t/(epsilon*delta_x) * (np.roll(hz_new, -1) - hz_new) - (delta_t/epsilon)*(Jy+j_q)
                     for sheet in range(n_sheets):
@@ -359,7 +368,7 @@ def expectation_value_energy(psi_r, psi_im):
 def check_continuity_final(psi_r, psi_im):
     A, B = update_matrix_velocity()
     norm_list = np.zeros((n_t, n_y))
-    for i in range(0,n_t):
+    for i in range(0,n_t): # The result should not be interpreted for i = 0
 
         psi_r_new = psi_r[:,i+1][:,0] # timestep i+3/2
         psi_im_new = psi_im[:,i][:,0] # timestep i+1
@@ -375,7 +384,7 @@ def check_continuity_final(psi_r, psi_im):
         J = (hbar/m)*(psi_r_old*(B @ psi_im_middle)-psi_im_middle*(B @ psi_r_old))/(12*delta_y)
         # the above was evaluated at timestep i+1/2, thus using psi_r_old and psi_im_middle
 
-        dPdt = (psi_norm - norm_list[i-1,:])/delta_t # evaluated at timestep i+1/2
+        dPdt = (psi_norm - norm_list[i-1,:])/(safe_frequency*delta_t) # evaluated at timestep i+1/2
         grad_J = (B @ J)/(12*delta_y) # Gradient of J
         results_cont = dPdt+grad_J
         rel_error = np.divide(results_cont, dPdt)
@@ -395,7 +404,7 @@ plt.ylabel('Norm')
 plt.legend()
 plt.show()
 
-# check_continuity_final(psi_r, psi_im)
+#check_continuity_final(psi_r, psi_im)
 
 
 
